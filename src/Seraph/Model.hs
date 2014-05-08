@@ -2,6 +2,7 @@
 module Seraph.Model ( Directive(..)
                     , Event(..)
                     , oracle
+                    , oracleModel
                     ) where
 
 import Data.Maybe ( isJust
@@ -15,19 +16,29 @@ import Data.Set ( (\\)
                 )
 import qualified Data.Set as S
 import qualified Data.Map as M
+import MVC
+
+import Debug.Trace
 
 import Seraph.Types
 
-data Directive = SpawnProgs [Program]
-               | KillProgs [ProgramId]
-               | Exit deriving (Show, Eq)
+oracleModel :: Model Config Event ([Directive], [String])
+oracleModel = asPipe $ loop model
+  where
+    -- model = unwrapModel oracle
+    model = unwrapModel oracleDebug
 
-data Event = NewConfig Config
-           | ProcessDeath ProgramId
-           | ProgRunning ProgramId
-           | ShutdownRequested
+unwrapModel :: (Event -> WriterT [String] (State s) a)
+          -> Event
+          -> ListT (State s) (a, [String])
+unwrapModel f e = lift $ runWriterT (f e)
 
---TODO: enforce invariant on running being subset of configured
+oracleDebug e = do
+  s <- get
+  res <- traceShow s $ oracle e
+  s' <- get
+  traceShow ("EVT", e, "BEFORE", s, "AFTER", s') $ return res
+
 oracle :: Event -> WriterT [String] (State Config) [Directive]
 oracle (ProcessDeath pid) = do
   existing <- gets $ view $ running . at pid . to isJust

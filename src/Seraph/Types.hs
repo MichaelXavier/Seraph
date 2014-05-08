@@ -5,9 +5,12 @@ module Seraph.Types ( Config(..)
                     , HasProgramId(..)
                     , Program(..)
                     , HasProgram(..)
+                    , Directive(..)
+                    , Event(..)
                     ) where
 
-import Control.Lens (makeClassy)
+import Control.Lens
+import Data.Monoid
 import Data.Map (Map)
 import Data.Set (Set)
 
@@ -34,3 +37,17 @@ data Config = Config { _configured :: Map ProgramId Program
                      , _running    :: Set ProgramId
                      } deriving (Show, Eq)
 makeClassy ''Config
+
+instance Monoid Config where
+  mempty = Config mempty mempty
+  c1 `mappend` c2 = c1 & configured <>~ c2 ^. configured
+                       & running    <>~ c2 ^. running
+
+data Directive = SpawnProgs [Program]
+               | KillProgs [ProgramId]
+               | Exit deriving (Show, Eq)
+
+data Event = NewConfig Config
+           | ProcessDeath ProgramId
+           | ProgRunning ProgramId
+           | ShutdownRequested deriving (Show, Eq)

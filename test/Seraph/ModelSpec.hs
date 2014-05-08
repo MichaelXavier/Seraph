@@ -35,6 +35,7 @@ oracleTests = testGroup "oracle" [
   , testProperty "Shutdown kills all running" $ \cfg ->
      let (KillProgs pids:_, _, _) = runOracle ShutdownRequested cfg
       in S.fromList pids == (cfg ^. running)
+  --TODO: given a reasonable (or empty) config, any list of operations will never result in mismapped ProgIds
                                  ]
 
 removeFromConfig :: Config -> ProgramId -> Config
