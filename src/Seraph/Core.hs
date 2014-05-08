@@ -25,10 +25,10 @@ import System.Exit (exitSuccess)
 
 --TODO: kill pipes to shutdown?
 
-core :: FilePath -> Managed (View ([Directive], [String]), Controller Event)
-core fp = do
+core :: Config -> FilePath -> Managed (View ([Directive], [String]), Controller Event)
+core initCfg fp = do
   exits <- exitController
-  cfgC  <- configController fp
+  cfgC  <- configController initCfg fp
   (downstreamSide, ctrlSide) <- managed managedSpawn
   return (aggregatedView downstreamSide,
           exits <> cfgC <> downstreamController ctrlSide)
@@ -62,21 +62,24 @@ exitSignalhandler sig = do
     sendKill output = void . atomically $ send output ShutdownRequested
 
 --TODO: fire initial state somehow, lol
-configController :: FilePath -> Managed (Controller Event)
-configController fp = managed $ \f ->
-  f . asInput =<< hupSignalHandler fp
+configController :: Config -> FilePath -> Managed (Controller Event)
+configController initCfg fp = managed $ \f ->
+  f . asInput =<< hupSignalHandler initCfg fp
 
-hupSignalHandler :: FilePath -> IO (Input Event)
-hupSignalHandler fp = do
+hupSignalHandler :: Config -> FilePath -> IO (Input Event)
+hupSignalHandler initCfg fp = do
   (output, input) <- spawn Single
-  liftIO $ installHandler sigHUP (Catch $ reloadConfig output) Nothing
+  liftIO $ do
+    installHandler sigHUP (Catch $ reloadConfig output) Nothing
+    notify output initCfg
   return input
   where
+    notify output = void . atomically . send output . NewConfig
     reloadConfig output = do
       putStrLn "HUP"
       cfg <- load fp
       case cfg of
-        Right c -> putStrLn ("SENDING " ++ show cfg) >> (void . atomically $ send output (NewConfig c))
+        Right c -> putStrLn ("SENDING " ++ show cfg) >> notify output c
         _       -> error "TODO: handle error better"
 
 data DownstreamMsg = ProgStarted ProgramId

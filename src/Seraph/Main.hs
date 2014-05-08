@@ -12,5 +12,5 @@ import Seraph.Model (oracleModel)
 main :: IO ()
 main = do
   (fp:_) <- getArgs
-  (Right cfg) <- load fp
-  void $ runMVC mempty oracleModel (core fp)
+  (Right initCfg) <- load fp
+  void $ runMVC mempty oracleModel (core initCfg fp)

@@ -25,8 +25,8 @@ import Seraph.Types
 oracleModel :: Model Config Event ([Directive], [String])
 oracleModel = asPipe $ loop model
   where
-    -- model = unwrapModel oracle
-    model = unwrapModel oracleDebug
+    model = unwrapModel oracle
+    -- model = unwrapModel oracleDebug
 
 unwrapModel :: (Event -> WriterT [String] (State s) a)
           -> Event
