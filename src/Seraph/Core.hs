@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Seraph.Core (core) where
 
 import Control.Lens
@@ -22,8 +21,6 @@ import System.Posix.Signals ( sigTERM
 import Seraph.Config (load)
 import Seraph.Types
 import System.Exit (exitSuccess)
-
---TODO: kill pipes to shutdown?
 
 core :: Config -> FilePath -> Managed (View ([Directive], [String]), Controller Event)
 core initCfg fp = do
@@ -61,7 +58,6 @@ exitSignalhandler sig = do
   where
     sendKill output = void . atomically $ send output ShutdownRequested
 
---TODO: fire initial state somehow, lol
 configController :: Config -> FilePath -> Managed (Controller Event)
 configController initCfg fp = managed $ \f ->
   f . asInput =<< hupSignalHandler initCfg fp
@@ -122,6 +118,3 @@ killProg :: Output DownstreamMsg -> ProgramId -> IO ()
 killProg out pid = do
   putStrLn $ "KILL " ++ show pid
   void . atomically $ send out (ProgEnded pid)
-
-
--- create a ProcessRegistry that only exposes explicit actions

@@ -13,17 +13,23 @@ import Control.Lens
 import Data.Monoid
 import Data.Map (Map)
 import Data.Set (Set)
+import System.Posix.Types ( UserID
+                          , GroupID)
 
 newtype ProgramId = ProgramId { _pidStr :: String} deriving (Show, Eq, Ord)
 
 makeClassy ''ProgramId
 
+--TODO: use real filepaths
+--TODO: uid, guid using getAllGroupEntries
 data Program = Program {
   _name       :: ProgramId,
-  _exec       :: Maybe String,
+  _exec       :: String,
   _delay      :: Maybe Int,
-  _stdout     :: Maybe String,
-  _stderr     :: Maybe String,
+  _userName   :: Maybe String,
+  _groupName  :: Maybe String,
+  _stdout     :: Maybe FilePath,
+  _stderr     :: Maybe FilePath,
   _workingDir :: Maybe FilePath,
   _logExec    :: Maybe String,
   _pidFile    :: Maybe FilePath,
