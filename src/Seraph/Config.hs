@@ -12,4 +12,4 @@ load _ = return $ Right cfg
   where
     cfg = mempty & configured . at pid .~ Just prog
     pid = ProgramId "example"
-    prog = Program pid Nothing Nothing Nothing Nothing Nothing Nothing Nothing mempty Nothing
+    prog = Program pid "do-stuff" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing mempty Nothing

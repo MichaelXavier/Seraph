@@ -19,6 +19,7 @@ import System.Posix.Signals ( sigTERM
                             )
 
 import Seraph.Config (load)
+import Seraph.Process
 import Seraph.Types
 import System.Exit (exitSuccess)
 
@@ -38,11 +39,6 @@ downstreamController = asInput . fmap mapDownstream
   where
     mapDownstream (ProgStarted pid) = ProgRunning pid
     mapDownstream (ProgEnded pid)   = ProcessDeath pid
-
-data PHandle = PHandle
---TODO: real one
-waitForProcess :: PHandle -> IO ()
-waitForProcess = const $ threadDelay 2000000
 
 exitController :: Managed (Controller Event)
 exitController = managed $ \f -> do
@@ -105,14 +101,14 @@ processDirective out (KillProgs pids) = mapM_ (killProg out) pids
 processDirective out (Exit) = liftIO exitSuccess
 
 -- maybe async
-spawnProg :: Output DownstreamMsg -> Program -> IO ()
-spawnProg out prog = do
-  putStrLn $ "START " ++ prog ^. name . to show
-  notify (ProgStarted pid)
-  void . forkIO $ waitForProcess PHandle >> notify (ProgEnded pid)
-  where
-    notify msg = void . atomically $ send out msg
-    pid = prog ^. name
+-- spawnProg :: Output DownstreamMsg -> Program -> IO ()
+-- spawnProg out prog = do
+--   putStrLn $ "START " ++ prog ^. name . to show
+--   notify (ProgStarted pid)
+--   void . forkIO $ waitForProcess PHandle >> notify (ProgEnded pid)
+--   where
+--     notify msg = void . atomically $ send out msg
+--     pid = prog ^. name
 
 killProg :: Output DownstreamMsg -> ProgramId -> IO ()
 killProg out pid = do
