@@ -5,6 +5,7 @@ module SpecHelper ( module X
 import Debug.Trace as X
 import Control.Applicative as X
 import Test.Tasty as X
+import Test.Tasty.HUnit as X
 import Test.Tasty.QuickCheck as X
 import Control.Lens as X hiding (elements)
 import Control.Monad.State.Strict as X

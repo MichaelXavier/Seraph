@@ -1,8 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Seraph.Process ( SpawnError(..)
-                      ,  ProcessHandle
-                      , waitOn
+module Seraph.Process ( waitOn
                       , kill
                       , spawnProg ) where
 
@@ -13,14 +11,20 @@ import Control.Monad
 import Control.Monad.Trans
 import Control.Error
 import System.IO.Error (tryIOError)
-import System.Posix.Directory
-import System.Posix.IO
-import System.Posix.Process
-import System.Posix.Signals
-import System.Posix.Types
-import System.Posix.User hiding ( userName
-                                , groupName)
+-- import System.Posix.Directory
+import System.Posix.IO ( stdOutput
+                       , stdError
+                       , OpenFileFlags(..)
+                       , defaultFileFlags
+                       , OpenMode(WriteOnly) )
+import System.Posix.Process (ProcessStatus)
+import System.Posix.Signals ( sigTERM
+                            , sigKILL )
+-- import System.Posix.Types
+import System.Posix.Types ( UserID
+                          , GroupID )
 
+import Seraph.Free
 import Seraph.Types
 import Seraph.Util
 {-
@@ -39,18 +43,19 @@ ProcessHandle will need to give a hook for death, and a command for kill
 NemesisD, (dupTo stdout <target> >> hclose stdout ) IIRC
 -}
 
-data SpawnError = InvalidExec
-                | InvalidUser
-                | InvalidGroup
 
-data KillPolicy = SoftKill | HardKill Int
+--TODO: move these to Process
+kill :: ProcessHandle -> SeraphProcessM ()
+kill ph = do
+  softKill
+  case ph ^. policy of
+    HardKill n -> waitSecs n >> hardKill
+    _          -> return ()
+  where
+    softKill = signalProcess sigTERM $ ph ^. pid
+    hardKill = signalProcess sigKILL $ ph ^. pid
 
-data ProcessHandle = ProcessHandle { _pid    :: ProcessID
-                                   , _policy :: KillPolicy }
-
-makeClassy ''ProcessHandle
-
-waitOn :: ProcessHandle -> IO ProcessStatus
+waitOn :: ProcessHandle -> SeraphProcessM ProcessStatus
 waitOn ph = do
   ps <- getProcessStatus blocking stopped (ph ^. pid)
   maybe (waitOn ph) return ps
@@ -58,30 +63,31 @@ waitOn ph = do
     blocking = True
     stopped  = True
 
-kill :: ProcessHandle -> IO ()
-kill ph = do
-  softKill
-  case ph ^. policy of
-    HardKill n -> sleep n >> hardKill
-    _          -> return ()
-  where
-    softKill = signalProcess sigTERM $ ph ^. pid
-    hardKill = signalProcess sigKILL $ ph ^. pid
-    sleep n  = threadDelay (n * 1000000)
+{-
+figure out how to embed these frees.
 
-spawnProg :: Program -> IO (Either SpawnError ProcessHandle)
+fizruk suggests FreeT f (Free g)
+
+or data types ala cart a la Free (f :+: g) (compdata library)
+http://www.cs.ru.nl/~W.Swierstra/Publications/DataTypesALaCarte.pdf
+
+or write a function Bar m -> Foo m
+
+3 options: FreeT f (Free g), Free (f :+: g), f ~> g
+-}
+spawnProg :: Program -> SeraphProcessM (Either SpawnError ProcessHandle)
 spawnProg prog = runEitherT $ do
   (cmd, args) <- failWith InvalidExec $ prog ^. exec ^? cmdSplit
   uid <- getId progUid userName
   gid <- getId progGid groupName
-  pd <- lift $ forkProcess $ do
+  pd <- undefined $ forkProcess $ do --TODO: inject a means to run SeraphChildM
     mRun setUserID uid -- can mRuns be handled in maybeT that doesn't abort early?
     mRun setGroupID gid
     mRun changeWorkingDirectory $ prog ^. workingDir
     configureFDs prog
     --TODO: hookup pipes
     --TODO: richer return type
-    executeFile cmd searchPath args (prog ^. env . to Just)
+    executeFile cmd args (prog ^. env)
   return $ ProcessHandle pd $ prog ^. to killPolicy
   where
     searchPath = True
@@ -89,7 +95,7 @@ spawnProg prog = runEitherT $ do
       Nothing -> return Nothing
       Just n -> hoistEither . fmap Just =<< lift (f n)
 
-configureFDs :: Program -> IO ()
+configureFDs :: Program -> SeraphChild ()
 configureFDs prog
   | logProg  = undefined
   | otherwise = do
@@ -101,15 +107,15 @@ configureFDs prog
       fd' <- openFd fp WriteOnly Nothing defaultFileFlags { append = True }
       void $ dupTo fd fd'
 
-progUid :: String -> IO (Either SpawnError UserID)
-progUid uname = extract <$> tryIOError (getUserEntryForName uname)
+progUid :: String -> SeraphProcessM (Either SpawnError UserID)
+progUid uname = extract <$> getUserEntryForName uname
   where
-    extract = swapLeft InvalidUser . fmap userID
+    extract = note InvalidUser
 
-progGid :: String -> IO (Either SpawnError GroupID)
-progGid gname = extract <$> tryIOError (getGroupEntryForName gname)
+progGid :: String -> SeraphProcessM (Either SpawnError GroupID)
+progGid gname = extract <$> getGroupEntryForName gname
   where
-    extract = swapLeft InvalidGroup . fmap groupID
+    extract = note InvalidGroup
 
 killPolicy :: Program -> KillPolicy
 killPolicy Program { _termGrace = Just n } = HardKill n
@@ -122,7 +128,3 @@ cmdSplit = prism joinParts splitParts
     splitParts str = case words str of
                        (s:as) -> Right (s, as)
                        _      -> Left str
-
-
-swapLeft :: c -> Either a b -> Either c b
-swapLeft x = either (const $ Left x) Right

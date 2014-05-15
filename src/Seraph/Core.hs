@@ -96,7 +96,7 @@ processDirectives' out = mapM_ (processDirective out)
 
 --todo: signal
 processDirective :: Output DownstreamMsg -> Directive -> IO ()
-processDirective out (SpawnProgs ps) = mapM_ (spawnProg out) ps
+processDirective out (SpawnProgs ps) = mapM_ (undefined out) ps --TODO: spawnProg
 processDirective out (KillProgs pids) = mapM_ (killProg out) pids
 processDirective out (Exit) = liftIO exitSuccess
 

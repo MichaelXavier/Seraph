@@ -7,14 +7,19 @@ module Seraph.Types ( Config(..)
                     , HasProgram(..)
                     , Directive(..)
                     , Event(..)
+                    , LogCtx(..)
+                    , HasLogCtx(..)
+                    , SpawnError(..)
+                    , KillPolicy(..)
+                    , ProcessHandle(..)
+                    , HasProcessHandle(..)
                     ) where
 
 import Control.Lens
 import Data.Monoid
 import Data.Map (Map)
 import Data.Set (Set)
-import System.Posix.Types ( UserID
-                          , GroupID)
+import System.Posix.Types (ProcessID)
 
 newtype ProgramId = ProgramId { _pidStr :: String} deriving (Show, Eq, Ord)
 
@@ -57,3 +62,18 @@ data Event = NewConfig Config
            | ProcessDeath ProgramId
            | ProgRunning ProgramId
            | ShutdownRequested deriving (Show, Eq)
+
+newtype LogCtx = LogCtx { _ctx :: String }
+
+makeClassy ''LogCtx
+
+data SpawnError = InvalidExec
+                | InvalidUser
+                | InvalidGroup
+
+data KillPolicy = SoftKill | HardKill Int
+
+data ProcessHandle = ProcessHandle { _pid    :: ProcessID
+                                   , _policy :: KillPolicy }
+
+makeClassy ''ProcessHandle
