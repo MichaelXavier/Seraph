@@ -1,5 +1,4 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Seraph.Process ( waitOn
                       , kill
                       , spawnProg ) where
@@ -22,7 +21,8 @@ import System.Posix.Signals ( sigTERM
                             , sigKILL )
 -- import System.Posix.Types
 import System.Posix.Types ( UserID
-                          , GroupID )
+                          , GroupID
+                          , Fd )
 
 import Seraph.Free
 import Seraph.Types
@@ -44,7 +44,7 @@ NemesisD, (dupTo stdout <target> >> hclose stdout ) IIRC
 -}
 
 
---TODO: move these to Process
+--TODO: check process before hardkill
 kill :: ProcessHandle -> SeraphProcessM ()
 kill ph = do
   softKill
@@ -80,22 +80,21 @@ spawnProg prog = runEitherT $ do
   (cmd, args) <- failWith InvalidExec $ prog ^. exec ^? cmdSplit
   uid <- getId progUid userName
   gid <- getId progGid groupName
-  pd <- undefined $ forkProcess $ do --TODO: inject a means to run SeraphChildM
+  pd <- lift $ forkProcess $ do
     mRun setUserID uid -- can mRuns be handled in maybeT that doesn't abort early?
     mRun setGroupID gid
     mRun changeWorkingDirectory $ prog ^. workingDir
     configureFDs prog
     --TODO: hookup pipes
     --TODO: richer return type
-    executeFile cmd args (prog ^. env)
+    void $ executeFile cmd args (prog ^. env)
   return $ ProcessHandle pd $ prog ^. to killPolicy
   where
-    searchPath = True
     getId f reader = case prog ^. reader of
       Nothing -> return Nothing
       Just n -> hoistEither . fmap Just =<< lift (f n)
 
-configureFDs :: Program -> SeraphChild ()
+configureFDs :: Program -> SeraphChildM ()
 configureFDs prog
   | logProg  = undefined
   | otherwise = do
@@ -104,7 +103,7 @@ configureFDs prog
   where
     logProg  = prog ^. logExec . to isJust
     logToFile fd fp = do
-      fd' <- openFd fp WriteOnly Nothing defaultFileFlags { append = True }
+      fd' <- openFd fp WriteOnly defaultFileFlags { append = True }
       void $ dupTo fd fd'
 
 progUid :: String -> SeraphProcessM (Either SpawnError UserID)

@@ -27,7 +27,6 @@ executable seraph
   build-depends: lens
   build-depends: mtl
   build-depends: mvc
-  build-depends: process >= 1.2.0.0
   build-depends: split
   build-depends: stm
   build-depends: unix >= 2.7.0.1
@@ -42,6 +41,7 @@ test-suite spec
   build-depends: QuickCheck
   build-depends: base >=4.6
   build-depends: containers
+  build-depends: errors
   build-depends: derive
   build-depends: free
   build-depends: lens
@@ -50,4 +50,5 @@ test-suite spec
   build-depends: tasty
   build-depends: tasty-hunit
   build-depends: tasty-quickcheck
+  build-depends: unix >= 2.7.0.1
   ghc-options: -threaded -with-rtsopts=-N4

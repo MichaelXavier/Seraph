@@ -2,16 +2,20 @@
 module SpecHelper ( module X
                   , debug ) where
 
+import qualified Data.Map as X (Map)
 import Debug.Trace as X
 import Control.Applicative as X
 import Test.Tasty as X
 import Test.Tasty.HUnit as X
 import Test.Tasty.QuickCheck as X
 import Control.Lens as X hiding (elements)
+import Control.Monad.Free as X
+import Control.Monad.Reader.Class as X
 import Control.Monad.State.Strict as X
 import Control.Monad.Writer.Strict as X
 import Data.Maybe as X
 import Seraph.Types as X
+import System.Posix.Types as X
 
 import Data.DeriveTH (derive)
 import Data.Derive.Arbitrary (makeArbitrary)

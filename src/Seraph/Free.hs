@@ -27,6 +27,7 @@ makeFree ''SeraphView
 
 type SeraphViewM = Free SeraphView
 
+-- i think these "IO" ops here need to come back as SeraphChildM
 data SeraphChild next = SetUserID UserID next
                       | SetGroupID GroupID next
                       | ChangeWorkingDirectory FilePath next
@@ -42,8 +43,8 @@ data SeraphProcess next = SignalProcess Signal ProcessID next
                         | WaitSecs Int next
                         | GetUserEntryForName String (Maybe UserID -> next)
                         | GetGroupEntryForName String (Maybe GroupID -> next)
-                        | ForkProcess (SeraphChild ProcessID -> next)
-                        | GetProcessStatus Bool Bool ProcessID (Maybe ProcessStatus -> next)
+                        | ForkProcess (SeraphChildM ()) (ProcessID -> next)
+                        | GetProcessStatus ProcessID (Maybe ProcessStatus -> next)
                         deriving (Functor)
 
 makeFree ''SeraphProcess
