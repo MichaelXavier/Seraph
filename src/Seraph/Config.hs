@@ -6,10 +6,10 @@ import Data.Monoid
 
 import Seraph.Types
 
---TODO
+--TODO: actually parse
 load :: FilePath -> IO (Either SomeException Config)
 load _ = return $ Right cfg
   where
-    cfg = mempty & configured . at pid .~ Just prog
-    pid = ProgramId "example"
-    prog = Program pid "do-stuff" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing mempty Nothing
+    cfg = mempty & configured . at prid .~ Just prog
+    prid = ProgramId "example"
+    prog = Program prid "sleep 3" Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing mempty Nothing

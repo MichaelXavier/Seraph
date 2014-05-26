@@ -37,7 +37,8 @@ oracleDebug e = do
   s <- get
   res <- traceShow s $ oracle e
   s' <- get
-  traceShow ("EVT", e, "BEFORE", s, "AFTER", s') $ return res
+  --traceShow ("EVT", e, "BEFORE", s, "AFTER", s') $ return res
+  traceShow ("EVT", e, "RES", res) $ return res
 
 oracle :: Event -> WriterT [String] (State Config) [Directive]
 oracle (ProcessDeath pid) = do
@@ -52,6 +53,7 @@ oracle (ProcessDeath pid) = do
            else [SpawnProgs progs]
 oracle (ProgRunning pid) = do
   modify $ \c -> c & running <>~ S.singleton pid
+  mainLogger $ "Marked " ++ show pid ++ " as running"
   return []
 oracle (NewConfig cfg) = do
   oldCfg <- get

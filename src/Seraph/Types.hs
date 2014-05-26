@@ -13,6 +13,7 @@ module Seraph.Types ( Config(..)
                     , KillPolicy(..)
                     , ProcessHandle(..)
                     , HasProcessHandle(..)
+                    , killPolicy
                     ) where
 
 import Control.Lens
@@ -69,11 +70,15 @@ makeClassy ''LogCtx
 
 data SpawnError = InvalidExec
                 | InvalidUser
-                | InvalidGroup
+                | InvalidGroup deriving (Show, Eq)
 
-data KillPolicy = SoftKill | HardKill Int
+data KillPolicy = SoftKill | HardKill Int deriving (Show, Eq)
 
 data ProcessHandle = ProcessHandle { _pid    :: ProcessID
-                                   , _policy :: KillPolicy }
+                                   , _policy :: KillPolicy } deriving (Show, Eq)
 
 makeClassy ''ProcessHandle
+
+killPolicy :: Program -> KillPolicy
+killPolicy Program { _termGrace = Just n } = HardKill n
+killPolicy _                               = SoftKill

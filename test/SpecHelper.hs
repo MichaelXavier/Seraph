@@ -15,6 +15,9 @@ import Control.Monad.State.Strict as X
 import Control.Monad.Writer.Strict as X
 import Data.Maybe as X
 import Seraph.Types as X
+import System.Posix.Signals as X
+import System.Posix.User as X hiding (groupName, userName)
+import System.Posix.Process as X
 import System.Posix.Types as X
 
 import Data.DeriveTH (derive)

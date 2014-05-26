@@ -1,28 +1,35 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Seraph.Process ( waitOn
                       , kill
-                      , spawnProg ) where
+                      , spawnProg
+                      , runSeraphChildM
+                      , runSeraphProcessM ) where
 
 import Control.Applicative
 import Control.Concurrent
 import Control.Lens
 import Control.Monad
+import Control.Monad.Free (iterM)
 import Control.Monad.Trans
 import Control.Error
 import System.IO.Error (tryIOError)
--- import System.Posix.Directory
 import System.Posix.IO ( stdOutput
                        , stdError
                        , OpenFileFlags(..)
                        , defaultFileFlags
                        , OpenMode(WriteOnly) )
 import System.Posix.Process (ProcessStatus)
+import System.Posix.User ( UserEntry(userID)
+                         , GroupEntry(groupID) )
+import qualified System.Posix.Directory as P
+import qualified System.Posix.IO as P
+import qualified System.Posix.Process as P
+import qualified System.Posix.Signals as P
+import qualified System.Posix.User as P
 import System.Posix.Signals ( sigTERM
                             , sigKILL )
--- import System.Posix.Types
 import System.Posix.Types ( UserID
-                          , GroupID
-                          , Fd )
+                          , GroupID )
 
 import Seraph.Free
 import Seraph.Types
@@ -43,6 +50,31 @@ ProcessHandle will need to give a hook for death, and a command for kill
 NemesisD, (dupTo stdout <target> >> hclose stdout ) IIRC
 -}
 
+runSeraphChildM :: MonadIO m => SeraphChildM a -> m a
+runSeraphChildM = iterM run
+  where
+    run (SetUserID i next)              = liftIO (P.setUserID i) >> next
+    run (SetGroupID i next)             = liftIO (P.setGroupID i) >> next
+    run (ChangeWorkingDirectory p next) = liftIO (P.changeWorkingDirectory p) >> next
+    run (ExecuteFile f as e next)       = next =<< liftIO (P.executeFile f searchPath as (Just e))
+    run (OpenFd p m fs next)            = next =<< liftIO (P.openFd p m fmode fs)
+    run (DupTo fd1 fd2 next)            = liftIO (P.dupTo fd1 fd2) >> next
+    fmode                               = Nothing
+    searchPath                          = True
+
+runSeraphProcessM :: MonadIO m => SeraphProcessM a -> m a
+runSeraphProcessM = iterM run
+  where
+    run (SignalProcess sig prid next)  = liftIO (P.signalProcess sig prid) >> next
+    run (WaitSecs n next)              = liftIO (threadDelay (n * 1000000)) >> next
+    run (GetUserEntryForName n next)   = next . fmap userID =<< liftTry (P.getUserEntryForName n)
+    run (GetGroupEntryForName n next)  = next . fmap groupID  =<< liftTry (P.getGroupEntryForName n)
+    run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (runSeraphChildM m))
+    run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus block stopped i)
+    block = True
+    stopped = True
+    try' = fmap hush . tryIOError
+    liftTry = liftIO . try'
 
 --TODO: check process before hardkill
 kill :: ProcessHandle -> SeraphProcessM ()
@@ -57,36 +89,19 @@ kill ph = do
 
 waitOn :: ProcessHandle -> SeraphProcessM ProcessStatus
 waitOn ph = do
-  ps <- getProcessStatus blocking stopped (ph ^. pid)
+  ps <- getProcessStatus (ph ^. pid)
   maybe (waitOn ph) return ps
-  where
-    blocking = True
-    stopped  = True
 
-{-
-figure out how to embed these frees.
-
-fizruk suggests FreeT f (Free g)
-
-or data types ala cart a la Free (f :+: g) (compdata library)
-http://www.cs.ru.nl/~W.Swierstra/Publications/DataTypesALaCarte.pdf
-
-or write a function Bar m -> Foo m
-
-3 options: FreeT f (Free g), Free (f :+: g), f ~> g
--}
 spawnProg :: Program -> SeraphProcessM (Either SpawnError ProcessHandle)
 spawnProg prog = runEitherT $ do
   (cmd, args) <- failWith InvalidExec $ prog ^. exec ^? cmdSplit
   uid <- getId progUid userName
   gid <- getId progGid groupName
   pd <- lift $ forkProcess $ do
-    mRun setUserID uid -- can mRuns be handled in maybeT that doesn't abort early?
-    mRun setGroupID gid
-    mRun changeWorkingDirectory $ prog ^. workingDir
+    mRun uid setUserID -- can mRuns be handled in maybeT that doesn't abort early?
+    mRun gid setGroupID
+    mRun (prog ^. workingDir) changeWorkingDirectory
     configureFDs prog
-    --TODO: hookup pipes
-    --TODO: richer return type
     void $ executeFile cmd args (prog ^. env)
   return $ ProcessHandle pd $ prog ^. to killPolicy
   where
@@ -115,10 +130,6 @@ progGid :: String -> SeraphProcessM (Either SpawnError GroupID)
 progGid gname = extract <$> getGroupEntryForName gname
   where
     extract = note InvalidGroup
-
-killPolicy :: Program -> KillPolicy
-killPolicy Program { _termGrace = Just n } = HardKill n
-killPolicy _                               = SoftKill
 
 cmdSplit :: Simple Prism String (String, [String])
 cmdSplit = prism joinParts splitParts
