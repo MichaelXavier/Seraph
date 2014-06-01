@@ -12,7 +12,8 @@ import System.Exit
 import System.IO ( stderr
                  , hPutStrLn )
 
-import Seraph.Config (load)
+import Seraph.Config ( load
+                     , ConfigError )
 import Seraph.Core (core)
 import Seraph.Model (oracleModel)
 
@@ -29,7 +30,7 @@ main = do
     bail (InvalidConfig e) = errorExit ("Invalid config " ++ show e)
     load' fp = hoistEither . fmapL InvalidConfig =<< lift (load fp)
 
-data BootError = NoConfig | InvalidConfig SomeException
+data BootError = NoConfig | InvalidConfig ConfigError
 
 errorExit :: String -> IO ()
 errorExit msg = hPutStrLn stderr msg' >> exitFailure
