@@ -25,12 +25,15 @@ import Data.Text.Strict.Lens (packed)
 import Seraph.Types
 import Seraph.Util
 
+import Debug.Trace
+
 type RawConfig = HashMap Name Value
 
 --FIXME: doesn't seem to catch parseerrors
 load :: FilePath -> IO (Either ConfigError Config)
 load fp = runEitherT $ do
   raw <- hoistEither . fmapL LoadException =<< lift (try . C.getMap =<< C.load [Required fp])
+  lift . print $ splitConfig firstDot raw
   progs <- hoistEither . concatMapM (uncurry parseProg) . unGroup $ raw
   return $ mempty & configured <>~ buildConfigured progs
   where
@@ -79,7 +82,7 @@ expandByCount basePrid rc count = forM prids $ \prid -> do
 firstDot :: Name -> Maybe (Name, Name)
 firstDot n
   | T.null h    = Nothing
-  | otherwise = Just (h ,rest)
+  | otherwise = Just (h, rest)
   where
     (h, rest) = T.breakOn "." n & _2 %~ T.drop 1
 
@@ -89,7 +92,7 @@ splitConfig splitter = HM.toList . HM.foldrWithKey go mempty
     go :: Name -> Value -> HashMap Name RawConfig -> HashMap Name RawConfig
     go k v acc = case splitter k of
                    Nothing -> acc
-                   Just (master, rest) -> acc & ix master <>~ HM.singleton rest v
+                   Just (master, rest) -> acc & at master <>~ Just (HM.singleton rest v)
 
 lookupRequiredString k      = coerce k "String" _String <=< lookupRequired k
 lookupIntWithDefault k rc d = coerce k "Int" _Number $ fromMaybe (Number d) $ HM.lookup k rc
