@@ -33,6 +33,7 @@ data SeraphChild next = SetUserID UserID next
                       | ChangeWorkingDirectory FilePath next
                       | ExecuteFile String [String] [(String, String)] (ProcessID -> next)
                       | OpenFd FilePath OpenMode OpenFileFlags (Fd -> next)
+                      | CloseFd Fd next
                       | DupTo Fd Fd next deriving (Functor)
 
 makeFree ''SeraphChild

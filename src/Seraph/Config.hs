@@ -25,15 +25,12 @@ import Data.Text.Strict.Lens (packed)
 import Seraph.Types
 import Seraph.Util
 
-import Debug.Trace
-
 type RawConfig = HashMap Name Value
 
 --FIXME: doesn't seem to catch parseerrors
 load :: FilePath -> IO (Either ConfigError Config)
 load fp = runEitherT $ do
   raw <- hoistEither . fmapL LoadException =<< lift (try . C.getMap =<< C.load [Required fp])
-  lift . print $ splitConfig firstDot raw
   progs <- hoistEither . concatMapM (uncurry parseProg) . unGroup $ raw
   return $ mempty & configured <>~ buildConfigured progs
   where

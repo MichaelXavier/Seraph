@@ -12,6 +12,7 @@ import Control.Monad
 import Control.Monad.Free (iterM)
 import Control.Monad.Trans
 import Control.Error
+import Data.Monoid
 import System.IO.Error (tryIOError)
 import System.Posix.IO ( stdOutput
                        , stdError
@@ -22,6 +23,7 @@ import System.Posix.Process (ProcessStatus)
 import System.Posix.User ( UserEntry(userID)
                          , GroupEntry(groupID) )
 import qualified System.Posix.Directory as P
+import qualified System.Posix.Env as P
 import qualified System.Posix.IO as P
 import qualified System.Posix.Process as P
 import qualified System.Posix.Signals as P
@@ -34,6 +36,8 @@ import System.Posix.Types ( UserID
 import Seraph.Free
 import Seraph.Types
 import Seraph.Util
+
+import Debug.Trace
 {-
 spawning a program needs to handle these cases:
 
@@ -56,10 +60,14 @@ runSeraphChildM = iterM run
     run (SetUserID i next)              = liftIO (P.setUserID i) >> next
     run (SetGroupID i next)             = liftIO (P.setGroupID i) >> next
     run (ChangeWorkingDirectory p next) = liftIO (P.changeWorkingDirectory p) >> next
-    run (ExecuteFile f as e next)       = next =<< liftIO (P.executeFile f searchPath as (Just e))
+--    run (ExecuteFile f as e next)       = next =<< liftIO (P.executeFile f searchPath as (Just e))
+    run (ExecuteFile f as e next)       = do
+      e' <- liftIO P.getEnvironment
+      next =<< liftIO (P.executeFile f searchPath as (Just (e' <> e)))
     run (OpenFd p m fs next)            = next =<< liftIO (P.openFd p m fmode fs)
+    run (CloseFd fd next)               = liftIO (P.closeFd fd) >> next
     run (DupTo fd1 fd2 next)            = liftIO (P.dupTo fd1 fd2) >> next
-    fmode                               = Nothing
+    fmode                               = Just 666
     searchPath                          = True
 
 runSeraphProcessM :: MonadIO m => SeraphProcessM a -> m a
@@ -113,13 +121,14 @@ configureFDs :: Program -> SeraphChildM ()
 configureFDs prog
   | logProg  = undefined
   | otherwise = do
-    logToFile stdOutput $ fromMaybe "/dev/null" (prog ^. stdout)
-    logToFile stdError $ fromMaybe "/dev/null" (prog ^. stderr)
+    logToFile stdOutput $ fromMaybe devNull (prog ^. stdout)
+    logToFile stdError $ fromMaybe devNull (prog ^. stderr)
   where
     logProg  = prog ^. logExec . to isJust
-    logToFile fd fp = do
-      fd' <- openFd fp WriteOnly defaultFileFlags { append = True }
-      void $ dupTo fd fd'
+    logToFile existingFd fp = do
+      targetFd <- openFd fp WriteOnly defaultFileFlags { append = True }
+      void $ dupTo targetFd existingFd
+    devNull = "/dev/null"
 
 progUid :: String -> SeraphProcessM (Either SpawnError UserID)
 progUid uname = extract <$> getUserEntryForName uname
