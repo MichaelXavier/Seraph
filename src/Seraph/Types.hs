@@ -59,18 +59,20 @@ data Directive = SpawnProgs [Program]
                | KillProgs [ProgramId]
                | Exit deriving (Show, Eq)
 
+data SpawnError = InvalidExec
+                | InvalidUser
+                | InvalidGroup
+                | SpawnException IOError deriving (Show, Eq)
+
 data Event = NewConfig Config
            | ProcessDeath ProgramId
            | ProgRunning ProgramId
+           | ProgNotStarted ProgramId SpawnError
            | ShutdownRequested deriving (Show, Eq)
 
 newtype LogCtx = LogCtx { _ctx :: String }
 
 makeClassy ''LogCtx
-
-data SpawnError = InvalidExec
-                | InvalidUser
-                | InvalidGroup deriving (Show, Eq)
 
 data KillPolicy = SoftKill | HardKill Int deriving (Show, Eq)
 

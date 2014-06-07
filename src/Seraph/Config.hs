@@ -14,6 +14,7 @@ import qualified Data.Configurator as C
 import Data.Configurator.Types ( Name
                                , Value(..)
                                , Worth(..))
+import Data.Hashable (Hashable)
 import qualified Data.Map as M
 import Data.Monoid
 import Data.HashMap.Strict (HashMap)
@@ -91,14 +92,28 @@ splitConfig splitter = HM.toList . HM.foldrWithKey go mempty
                    Nothing -> acc
                    Just (master, rest) -> acc & at master <>~ Just (HM.singleton rest v)
 
+lookupRequiredString :: Name -> HashMap Name Value -> Either ConfigError String
 lookupRequiredString k      = coerce k "String" _String <=< lookupRequired k
+
+lookupIntWithDefault :: Name -> HashMap Name Value -> Rational -> Either ConfigError Int
 lookupIntWithDefault k rc d = coerce k "Int" _Number $ fromMaybe (Number d) $ HM.lookup k rc
+
+lookupOptionalMaybeInt :: Name -> HashMap Name Value -> Either ConfigError (Maybe Int)
 lookupOptionalMaybeInt k    = coerceMay k "Int" _Number <=< lookupOptional k
+
+lookupOptionalMaybeString :: Name -> HashMap Name Value -> Either ConfigError (Maybe String)
 lookupOptionalMaybeString k = coerceMay k "String" _String <=< lookupOptional k
+
+lookupRequired :: Name -> HashMap Name b -> Either ConfigError b
 lookupRequired k            = note (MissingKey k) . HM.lookup k
+
+lookupOptional :: (Hashable k, Eq k) => k -> HashMap k v -> Either a (Maybe v)
 lookupOptional k            = Right . HM.lookup k
 
+coerce :: Name -> String -> Simple Prism a b -> a -> Either ConfigError b
 coerce k t p v              = note (WrongType k t) $ v ^? p
+
+coerceMay :: Name -> String -> Simple Prism a b -> Maybe a -> Either ConfigError (Maybe b)
 coerceMay _ _ _ Nothing     = Right Nothing
 coerceMay k t p (Just v)    = Just <$> coerce k t p v
 

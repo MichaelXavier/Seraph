@@ -4,7 +4,7 @@
 module Seraph.Free where
 
 import Prelude hiding (log)
-import Control.Lens
+import Control.Exception
 import System.Posix.IO ( OpenMode
                        , OpenFileFlags )
 import System.Posix.Process ( ProcessStatus )
@@ -12,14 +12,10 @@ import System.Posix.Types ( ProcessID
                           , GroupID
                           , UserID
                           , Fd )
-import System.Posix.Signals ( Signal
-                            , sigTERM
-                            , sigKILL )
+import System.Posix.Signals ( Signal )
 
 import Control.Monad.Free
 import Control.Monad.Free.TH
-
-import Seraph.Types
 
 data SeraphView next = Log String next deriving (Functor)
 
@@ -31,9 +27,8 @@ type SeraphViewM = Free SeraphView
 data SeraphChild next = SetUserID UserID next
                       | SetGroupID GroupID next
                       | ChangeWorkingDirectory FilePath next
-                      | ExecuteFile String [String] [(String, String)] (ProcessID -> next)
-                      | OpenFd FilePath OpenMode OpenFileFlags (Fd -> next)
-                      | CloseFd Fd next
+                      | ExecuteFile String [String] [(String, String)] (Either IOException ProcessID -> next)
+                      | OpenFd FilePath OpenMode OpenFileFlags (Either IOException Fd -> next)
                       | DupTo Fd Fd next deriving (Functor)
 
 makeFree ''SeraphChild

@@ -4,10 +4,12 @@ module Seraph.Core (core) where
 import Control.Lens
 import Control.Applicative
 import Control.Concurrent.STM
+import Control.Error
 import Data.Map (Map)
 import Control.Monad
 import Control.Monad.Reader
 import Data.Monoid
+import System.IO.Error (tryIOError)
 import MVC
 import System.Posix.Signals ( sigTERM
                             , sigINT
@@ -23,6 +25,8 @@ import Seraph.Types
 import Seraph.Util
 import System.Exit (exitSuccess)
 
+import Debug.Trace
+
 data ViewState = ViewState { _pHandles :: Map ProgramId ProcessHandle }
 
 makeClassy ''ViewState
@@ -34,7 +38,7 @@ core initCfg fp = do
   (downstreamSide, ctrlSide) <- managed managedSpawn
   vs <- managed $ managedIO . atomically . newTVar $ ViewState mempty
   return (aggregatedView vs downstreamSide,
-          exits <> cfgC <> downstreamController ctrlSide)
+          exits <> downstreamController ctrlSide <> cfgC)
 
 managedIO :: IO a -> (a -> IO x) -> IO x
 managedIO = (>>=)
@@ -43,10 +47,11 @@ managedSpawn :: ((Output a, Input a) -> IO x) -> IO x
 managedSpawn f = f =<< spawn Single
 
 downstreamController :: Input DownstreamMsg -> Controller Event
-downstreamController = asInput . fmap mapDownstream
+downstreamController = asInput . fmap (\x -> traceShow ("YEAH",x) $  mapDownstream x)
   where
-    mapDownstream (ProgStarted prid) = ProgRunning prid
-    mapDownstream (ProgEnded prid)   = ProcessDeath prid
+    mapDownstream (ProgStarted prid)          = ProgRunning prid
+    mapDownstream (ProgEnded prid)            = ProcessDeath prid
+    mapDownstream (ProgFailedToStart prid se) = ProgNotStarted prid se
 
 exitController :: Managed (Controller Event)
 exitController = managed $ \f -> do
@@ -84,7 +89,7 @@ hupSignalHandler initCfg fp = do
 
 data DownstreamMsg = ProgStarted ProgramId
                    | ProgEnded ProgramId
-                   | ProgFailedToStart SpawnError --TODO: total case match for this
+                   | ProgFailedToStart ProgramId SpawnError deriving (Show)
 
 type ViewM a = ReaderT (TVar ViewState) IO a
 
@@ -113,21 +118,25 @@ processDirectives' out = mapM_ (processDirective out)
 processDirective :: Output DownstreamMsg -> Directive -> ViewM ()
 processDirective out (SpawnProgs ps) = mapM_ (spawnProg' out) ps
 processDirective out (KillProgs prids) = mapM_ (kill' out) prids
-processDirective _ (Exit) = liftIO exitSuccess
+processDirective _   (Exit) = liftIO exitSuccess
 
 spawnProg' :: Output DownstreamMsg -> Program -> ViewM ()
 spawnProg' out prog = do
-  result <- liftIO . runSeraphProcessM . spawnProg $ prog
+  result <- liftIO . normalizeExceptions . runSeraphProcessM . spawnProg $ prog
   liftIO $ print result
   either reportFailure registerHandle result
   where
-    reportFailure e = void . liftIO . atomically $ send out $ ProgFailedToStart e
+--    reportFailure e = void . liftIO . atomically $ send out $ ProgFailedToStart prid e
+    reportFailure e = do
+      void . liftIO . atomically $ send out $ ProgFailedToStart prid e
     --DANGER: need good testing around this area. forgot to send out messages downstream
     registerHandle ph = do
+      --FIXME: this blocks indefinitely
       void . liftIO . atomically $ send out $ ProgStarted prid
       writeHandle prid ph
       monitor out prid
     prid = prog ^. name
+    normalizeExceptions = fmap (join . fmapL SpawnException) . tryIOError
 
 writeHandle :: ProgramId -> ProcessHandle -> ViewM ()
 writeHandle prid ph = do

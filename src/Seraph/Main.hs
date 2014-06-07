@@ -1,7 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main (main) where
 
-import Control.Exception (SomeException)
 import Control.Error
 import Control.Monad (void)
 import Control.Monad.Trans (lift)

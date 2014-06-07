@@ -37,7 +37,7 @@ import Seraph.Free
 import Seraph.Types
 import Seraph.Util
 
-import Debug.Trace
+--import Debug.Trace
 {-
 spawning a program needs to handle these cases:
 
@@ -54,21 +54,21 @@ ProcessHandle will need to give a hook for death, and a command for kill
 NemesisD, (dupTo stdout <target> >> hclose stdout ) IIRC
 -}
 
+--TODO: richer child error types
 runSeraphChildM :: MonadIO m => SeraphChildM a -> m a
-runSeraphChildM = iterM run
+runSeraphChildM  = iterM run
   where
-    run (SetUserID i next)              = liftIO (P.setUserID i) >> next
-    run (SetGroupID i next)             = liftIO (P.setGroupID i) >> next
-    run (ChangeWorkingDirectory p next) = liftIO (P.changeWorkingDirectory p) >> next
---    run (ExecuteFile f as e next)       = next =<< liftIO (P.executeFile f searchPath as (Just e))
+    run (SetUserID i next)              = liftIO' (P.setUserID i) >> next
+    run (SetGroupID i next)             = liftIO' (P.setGroupID i) >> next
+    run (ChangeWorkingDirectory p next) = liftIO' (P.changeWorkingDirectory p) >> next
     run (ExecuteFile f as e next)       = do
-      e' <- liftIO P.getEnvironment
-      next =<< liftIO (P.executeFile f searchPath as (Just (e' <> e)))
-    run (OpenFd p m fs next)            = next =<< liftIO (P.openFd p m fmode fs)
-    run (CloseFd fd next)               = liftIO (P.closeFd fd) >> next
-    run (DupTo fd1 fd2 next)            = liftIO (P.dupTo fd1 fd2) >> next
+      existingEnv <- liftIO P.getEnvironment
+      next =<< liftIO' (P.executeFile f searchPath as (Just (existingEnv <> e)))
+    run (OpenFd p m fs next)            = next =<< liftIO' (P.openFd p m fmode fs)
+    run (DupTo fd1 fd2 next)            = liftIO' (P.dupTo fd1 fd2) >> next
     fmode                               = Just 666
     searchPath                          = True
+    liftIO' = liftIO . tryIOError
 
 runSeraphProcessM :: MonadIO m => SeraphProcessM a -> m a
 runSeraphProcessM = iterM run
@@ -77,7 +77,7 @@ runSeraphProcessM = iterM run
     run (WaitSecs n next)              = liftIO (threadDelay (n * 1000000)) >> next
     run (GetUserEntryForName n next)   = next . fmap userID =<< liftTry (P.getUserEntryForName n)
     run (GetGroupEntryForName n next)  = next . fmap groupID  =<< liftTry (P.getGroupEntryForName n)
-    run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (runSeraphChildM m))
+    run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (void $ runSeraphChildM m))
     run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus block stopped i)
     block = True
     stopped = True
@@ -126,7 +126,8 @@ configureFDs prog
   where
     logProg  = prog ^. logExec . to isJust
     logToFile existingFd fp = do
-      targetFd <- openFd fp WriteOnly defaultFileFlags { append = True }
+      --FIXME
+      Right targetFd <- openFd fp WriteOnly defaultFileFlags { append = True }
       void $ dupTo targetFd existingFd
     devNull = "/dev/null"
 
