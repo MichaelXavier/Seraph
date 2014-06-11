@@ -28,6 +28,7 @@ executable seraph
   build-depends: lens
   build-depends: mtl
   build-depends: mvc
+  build-depends: pipes
   build-depends: split
   build-depends: stm
   build-depends: text

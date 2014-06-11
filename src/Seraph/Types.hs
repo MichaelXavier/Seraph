@@ -31,7 +31,7 @@ makeClassy ''ProgramId
 data Program = Program {
   _name       :: ProgramId,
   _exec       :: String,
-  _delay      :: Maybe Int,
+  _delay      :: Int,
   _userName   :: Maybe String,
   _groupName  :: Maybe String,
   _stdout     :: Maybe FilePath,

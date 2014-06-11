@@ -105,6 +105,7 @@ spawnProg prog = runEitherT $ do
   (cmd, args) <- failWith InvalidExec $ prog ^. exec ^? cmdSplit
   uid <- getId progUid userName
   gid <- getId progGid groupName
+  waitSecs $ prog ^. delay
   pd <- lift $ forkProcess $ do
     mRun uid setUserID -- can mRuns be handled in maybeT that doesn't abort early?
     mRun gid setGroupID
