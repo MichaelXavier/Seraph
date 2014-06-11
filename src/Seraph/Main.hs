@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Main (main) where
 
 import Control.Error
@@ -19,7 +18,7 @@ import Seraph.Model (oracleModel)
 main :: IO ()
 main = do
   initAndFp <- runEitherT $ do
-    fp :: FilePath <- tryHead NoConfig =<< lift getArgs
+    fp <- tryHead NoConfig =<< lift getArgs
     initCfg <- load' fp
     return (initCfg, fp)
   either bail (uncurry boot) initAndFp
