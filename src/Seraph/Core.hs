@@ -123,6 +123,7 @@ processDirectives' :: TQueue DownstreamMsg -> [Directive] -> ViewM ()
 processDirectives' out = mapM_ (processDirective out)
 
 --TODO: make sure we can't exit until we attempted kills on everything
+--TODO: figure out how to parallelize these
 processDirective :: TQueue DownstreamMsg -> Directive -> ViewM ()
 processDirective out (SpawnProgs ps) = mapM_ (spawnProg' out) ps
 processDirective out (KillProgs prids) = mapM_ (kill' out) prids
