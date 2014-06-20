@@ -84,8 +84,6 @@ oracle ShutdownRequested = do
   return . FinalDirectives . map KillProg $ killPids
 oracle (ProgNotStarted prid e) = do
   spawnProgs <- getProgs [prid]
-  --TODO: nicer formatting
-  --TODO: stop flapping or keep going?
   progLogger $ "Failed to start: " ++ show e ++ ", retrying."
   return $ Directives $ map SpawnProg spawnProgs
   where
