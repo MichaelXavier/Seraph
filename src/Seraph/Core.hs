@@ -4,6 +4,7 @@ module Seraph.Core (core) where
 import Control.Lens
 import Control.Applicative
 import Control.Concurrent.STM
+import Control.Concurrent.Async
 import Control.Error
 import Data.Map (Map)
 import Control.Monad
@@ -33,7 +34,7 @@ data ViewState = ViewState { _pHandles :: Map ProgramId ProcessHandle }
 
 makeClassy ''ViewState
 
-core :: Config -> FilePath -> Managed (View ([Directive], [String]), Controller Event)
+core :: Config -> FilePath -> Managed (View (Directives, [String]), Controller Event)
 core initCfg fp = do
   exits <- exitController
   cfgC  <- configController initCfg fp
@@ -104,53 +105,48 @@ type ViewM a = ReaderT (TVar ViewState) IO a
 runViewM :: TVar ViewState -> ViewM a -> IO a
 runViewM = flip runReaderT
 
-aggregatedView :: TVar ViewState -> TQueue DownstreamMsg -> View ([Directive], [String])
+aggregatedView :: TVar ViewState -> TQueue DownstreamMsg -> View (Directives, [String])
 aggregatedView vs out = handles _1 (processDirectives vs out) <>
                         handles _2 (processLogs vs)
 
 processLogs :: TVar ViewState -> View [String]
 processLogs vs = asSink $ runViewM vs . processLogs'
 
---TODO: use ViewM or drop it
+--TODO: use ViewM ocdr drop it
 processLogs' ::  [String] -> ViewM ()
 processLogs' = mapM_ (liftIO . putStrLn)
 
 --TODO break up with prisms if applicable
-processDirectives :: TVar ViewState -> TQueue DownstreamMsg -> View [Directive]
-processDirectives vs out = asSink $ runViewM vs . processDirectives' out
+processDirectives :: TVar ViewState -> TQueue DownstreamMsg -> View Directives
+processDirectives vs out = asSink $ processDirectives' vs out
 
-processDirectives' :: TQueue DownstreamMsg -> [Directive] -> ViewM ()
-processDirectives' out = mapM_ (processDirective out)
-
---TODO: make sure we can't exit until we attempted kills on everything
---TODO: figure out how to parallelize these
-processDirective :: TQueue DownstreamMsg -> Directive -> ViewM ()
-processDirective out (SpawnProgs ps) = mapM_ (spawnProg' out) ps
-processDirective out (KillProgs prids) = mapM_ (kill' out) prids
-processDirective _   (Exit) = liftIO exitSuccess
+processDirectives' :: TVar ViewState -> TQueue DownstreamMsg -> Directives -> IO ()
+processDirectives' vs out = void . launch
+  where
+    launch (Directives ds)      = launchMany ds
+    launch (FinalDirectives ds) = launchMany ds >> liftIO exitSuccess
+    launchMany                  = mapConcurrently (runViewM vs . launchOne)
+    launchOne (SpawnProg p)     =  spawnProg' out p
+    launchOne (KillProg prid)   =  kill' out prid
 
 spawnProg' :: TQueue DownstreamMsg -> Program -> ViewM ()
 spawnProg' out prog = do
   result <- liftIO . normalizeExceptions . runSeraphProcessM . spawnProg $ prog
-  liftIO $ print result --TODO: log
   either reportFailure registerHandle result
   where
     reportFailure e = void . liftIO . atomically $ writeTQueue out $ ProgFailedToStart prid e
     --DANGER: need good testing around this area. forgot to send out messages downstream
     registerHandle ph = do
-      --FIXME: this blocks indefinitely
-      void . liftIO . atomically $ writeTQueue out $ ProgStarted prid
-      writeHandle prid ph
+      vsv <- ask
+      void . liftIO . atomically $ do
+        writeTQueue out $ ProgStarted prid
+        writeHandle prid ph vsv
       monitor out prid
     prid = prog ^. name
     normalizeExceptions = fmap (join . fmapL SpawnException) . tryIOError
 
-writeHandle :: ProgramId -> ProcessHandle -> ViewM ()
-writeHandle prid ph = do
-  vsv <- ask
-  liftIO . atomically $
-    modifyTVar' vsv (\vs -> vs & pHandles . at prid .~ Just ph)
-
+writeHandle :: ProgramId -> ProcessHandle -> TVar ViewState -> STM ()
+writeHandle prid ph vsv = modifyTVar' vsv (\vs -> vs & pHandles . at prid .~ Just ph)
 
 getHandle :: ProgramId -> ViewM (Maybe ProcessHandle)
 getHandle prid = do
@@ -162,10 +158,9 @@ monitor :: TQueue DownstreamMsg -> ProgramId -> ViewM ()
 monitor out prid = do
   mph <- getHandle prid
   vsv <- ask
-  mRun mph $ \ph -> void . liftIO . forkIO $ do
-      runSeraphProcessM $ waitOn ph
-      progEnded out prid vsv
-      return ()
+  mRun mph $ \ph -> void . liftIO . forkIO . void $ do
+    runSeraphProcessM . waitOn $ ph
+    progEnded out prid vsv
 
 --FIXME: if we couldn't actually kill the program, should we send ended?
 kill' :: TQueue DownstreamMsg -> ProgramId -> ViewM ()

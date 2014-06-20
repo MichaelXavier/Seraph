@@ -80,7 +80,7 @@ runSeraphProcessM = iterM run
     run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (void $ runSeraphChildM m))
     run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus block stopped i)
     block = True
-    stopped = True
+    stopped = False
     try' = fmap hush . tryIOError
     liftTry = liftIO . try'
 

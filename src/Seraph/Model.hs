@@ -23,18 +23,20 @@ import Debug.Trace
 
 import Seraph.Types
 
-oracleModel :: Model Config Event ([Directive], [String])
+oracleModel :: Model Config Event (Directives, [String])
 oracleModel = asPipe $ loop model
   where
     model = unwrapModel oracle
     -- model = unwrapModel oracleDebug
 
-unwrapModel :: (Event -> WriterT [String] (State s) a)
-          -> Event
-          -> ListT (State s) (a, [String])
+type OracleM a = WriterT [String] (State Config) a
+
+unwrapModel :: (Event -> OracleM a)
+            -> Event
+            -> ListT (State Config) (a, [String])
 unwrapModel f e = lift $ runWriterT (f e)
 
-oracleDebug :: Event -> WriterT [String] (State Config) [Directive]
+oracleDebug :: Event -> OracleM Directives
 oracleDebug e = do
   s <- get
   res <- traceShow s $ oracle e
@@ -42,40 +44,59 @@ oracleDebug e = do
   -- traceShow ("EVT", e, "BEFORE", s, "AFTER", s') $ return res
   traceShow ("EVT", e, "RES", res) $ return res
 
-oracle :: Event -> WriterT [String] (State Config) [Directive]
+oracle :: Event -> OracleM Directives
 oracle (ProcessDeath prid) = do
+  progLogger "Process died"
   existing <- gets $ view $ running . at prid . to isJust
   mainLogger $ if existing
      then "Spawning " ++ prid ^. pidStr
      else "Unknown process " ++ prid ^. pidStr
   modify $ set (running . at prid) Nothing
   progs <- gets $ toListOf $ configured . ix prid
-  return $ if null progs
-           then []
-           else [SpawnProgs progs]
+  return $ Directives $ if null progs
+                        then  []
+                        else map SpawnProg progs
+  where
+    progLogger = ctxLogger (prid ^. pidStr)
 oracle (ProgRunning prid) = do
   modify $ \c -> c & running <>~ S.singleton prid
-  mainLogger $ "Marked " ++ show prid ++ " as running"
-  return []
+  progLogger "Marked as running"
+  return $ Directives []
+  where
+    progLogger = ctxLogger (prid ^. pidStr)
 oracle (NewConfig cfg) = do
+  mainLogger "New config"
   oldCfg <- get
+  put cfg
   let oldPids = configPids oldCfg
   let newPids = configPids cfg
   let currentlyRunning = oldCfg ^. running
   let spawnPids = newPids \\ oldPids
   let killPids = currentlyRunning \\ newPids
-  let spawnProgs = mapMaybe (\prid -> cfg ^. configured . at prid) (spawnPids ^. to S.toList)
-  put cfg
-  return [SpawnProgs spawnProgs, KillProgs (killPids ^. to S.toList)]
+  spawnProgs <- getProgs $ spawnPids ^. to S.toList
+  let spawns = map SpawnProg spawnProgs
+  let kills  = map KillProg $ killPids ^. to S.toList
+  mainLogger $ "Spawning " ++ slen spawns ++ " programs and killing " ++ slen kills
+  return . Directives $ spawns ++ kills
 oracle ShutdownRequested = do
   modify $ set configured mempty
   killPids <- gets $ view (running . to S.toList)
-  return [KillProgs killPids , Exit]
+  return . FinalDirectives . map KillProg $ killPids
 oracle (ProgNotStarted prid e) = do
+  spawnProgs <- getProgs [prid]
   --TODO: nicer formatting
   --TODO: stop flapping or keep going?
-  ctxLogger (prid ^. pidStr) $ "Failed to start: " ++ show e
-  return []
+  progLogger $ "Failed to start: " ++ show e ++ ", retrying."
+  return $ Directives $ map SpawnProg spawnProgs
+  where
+    progLogger = ctxLogger (prid ^. pidStr)
+
+getProgs :: [ProgramId] -> OracleM [Program]
+getProgs spawnPids = do
+  cfg <- get
+  return $ mapMaybe (progForPid cfg) spawnPids
+  where
+    progForPid cfg prid = cfg ^. configured . at prid
 
 configPids :: Config -> Set ProgramId
 configPids cfg = cfg ^. configured . to M.keys . to S.fromList
@@ -85,3 +106,6 @@ mainLogger = ctxLogger "seraph"
 
 ctxLogger :: MonadWriter [String] m =>  String -> String -> m ()
 ctxLogger label s = tell [unwords [label, "-", s]]
+
+slen :: Show a => [a] -> String
+slen = show . length

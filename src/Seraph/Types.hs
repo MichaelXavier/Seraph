@@ -6,6 +6,7 @@ module Seraph.Types ( Config(..)
                     , Program(..)
                     , HasProgram(..)
                     , Directive(..)
+                    , Directives(..)
                     , Event(..)
                     , LogCtx(..)
                     , HasLogCtx(..)
@@ -55,9 +56,11 @@ instance Monoid Config where
   c1 `mappend` c2 = c1 & configured <>~ c2 ^. configured
                        & running    <>~ c2 ^. running
 
-data Directive = SpawnProgs [Program]
-               | KillProgs [ProgramId]
-               | Exit deriving (Show, Eq)
+data Directive = SpawnProg Program
+               | KillProg ProgramId deriving (Show, Eq)
+
+data Directives = Directives [Directive]
+                | FinalDirectives [Directive] deriving (Show, Eq)
 
 data SpawnError = InvalidExec
                 | InvalidUser

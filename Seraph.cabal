@@ -19,6 +19,7 @@ executable seraph
   main-is: Seraph/Main.hs
   -- other-modules:
   -- other-extensions:
+  build-depends: async
   build-depends: base >=4.6
   build-depends: configurator >= 0.2.0.2
   build-depends: containers
