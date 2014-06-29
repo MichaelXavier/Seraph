@@ -38,8 +38,21 @@ oracleTests = testGroup "oracle" [
      let (FinalDirectives ds, _, _) = runOracle ShutdownRequested cfg
          prids                 = map (\(KillProg prid) -> prid) ds
      in S.fromList prids == (cfg ^. running)
+  , testProperty "ProgNotStarted only ever launches a max of 1 process" $ \prid e cfg ->
+     let pns = ProgNotStarted prid e
+         (Directives ds, _, _) = runOracle pns cfg
+     in length ds <= 1 && all isSpawn ds
+  -- , testProperty "any sequence of events exept a new config will not modify configured programs" $ \cfg evts ->
+  --    undefined
+  -- , testProperty "any sequence of events exept a new config will not launch a directive for a program not in the config" $ \cfg evts ->
+  --    undefined
   --TODO: given a reasonable (or empty) config, any list of operations will never result in mismapped ProgIds
                                  ]
+
+--TODO: use prisms
+isSpawn :: Directive -> Bool
+isSpawn (SpawnProg _) = True
+isSpawn _             = False
 
 isFinal :: Directives -> Bool
 isFinal (FinalDirectives _) = True

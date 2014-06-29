@@ -84,15 +84,18 @@ runSeraphProcessM = iterM run
     try' = fmap hush . tryIOError
     liftTry = liftIO . try'
 
---TODO: check process before hardkill
 kill :: ProcessHandle -> SeraphProcessM ()
 kill ph = do
   softKill
   case ph ^. policy of
-    HardKill n -> waitSecs n >> hardKill
+    HardKill n -> waitSecs n >> hardKillIfRunning
     _          -> return ()
   where
     softKill = signalProcess sigTERM $ ph ^. pid
+    hardKillIfRunning = do
+      ps <- getProcessStatus (ph ^. pid)
+      --TODO: testme
+      when (isNothing ps) hardKill
     hardKill = signalProcess sigKILL $ ph ^. pid
 
 waitOn :: ProcessHandle -> SeraphProcessM ProcessStatus

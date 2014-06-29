@@ -79,6 +79,7 @@ oracle (NewConfig cfg) = do
   mainLogger $ "Spawning " ++ slen spawns ++ " programs and killing " ++ slen kills
   return . Directives $ spawns ++ kills
 oracle ShutdownRequested = do
+  mainLogger "Shutdown requested."
   modify $ set configured mempty
   killPids <- gets $ view (running . to S.toList)
   return . FinalDirectives . map KillProg $ killPids

@@ -23,6 +23,7 @@ import System.Posix.Signals ( sigTERM
                             )
 
 import Seraph.Config (load)
+import Seraph.Log
 import Seraph.Process
 import Seraph.Types
 import Seraph.Util
@@ -105,29 +106,29 @@ type ViewM a = ReaderT (TVar ViewState) IO a
 runViewM :: TVar ViewState -> ViewM a -> IO a
 runViewM = flip runReaderT
 
+-- Can't use handles here because we want to log first before
+-- something that could terminate the progra
 aggregatedView :: TVar ViewState -> TQueue DownstreamMsg -> View (Directives, [String])
-aggregatedView vs out = handles _1 (processDirectives vs out) <>
-                        handles _2 (processLogs vs)
+aggregatedView vs out = asSink $ \(ds, ls) -> do
+  processLogs ls
+  processDirectives vs out ds
 
-processLogs :: TVar ViewState -> View [String]
-processLogs vs = asSink $ runViewM vs . processLogs'
+--TODO: use ViewM or drop it
+processLogs ::  [String] -> IO ()
+processLogs ss = do
+  time <- getFormattedTime
+  mapM_ (writeLog time) ss
+  where
+    writeLog time s = putStrLn $ mconcat ["[", time, "] ", s]
 
---TODO: use ViewM ocdr drop it
-processLogs' ::  [String] -> ViewM ()
-processLogs' = mapM_ (liftIO . putStrLn)
-
---TODO break up with prisms if applicable
-processDirectives :: TVar ViewState -> TQueue DownstreamMsg -> View Directives
-processDirectives vs out = asSink $ processDirectives' vs out
-
-processDirectives' :: TVar ViewState -> TQueue DownstreamMsg -> Directives -> IO ()
-processDirectives' vs out = void . launch
+processDirectives :: TVar ViewState -> TQueue DownstreamMsg -> Directives -> IO ()
+processDirectives vs out = void . launch
   where
     launch (Directives ds)      = launchMany ds
     launch (FinalDirectives ds) = launchMany ds >> liftIO exitSuccess
     launchMany                  = mapConcurrently (runViewM vs . launchOne)
-    launchOne (SpawnProg p)     =  spawnProg' out p
-    launchOne (KillProg prid)   =  kill' out prid
+    launchOne (SpawnProg p)     = spawnProg' out p
+    launchOne (KillProg prid)   = kill' out prid
 
 spawnProg' :: TQueue DownstreamMsg -> Program -> ViewM ()
 spawnProg' out prog = do

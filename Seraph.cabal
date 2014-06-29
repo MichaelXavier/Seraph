@@ -29,10 +29,12 @@ executable seraph
   build-depends: lens
   build-depends: mtl
   build-depends: mvc
+  build-depends: old-locale
   build-depends: pipes
   build-depends: split
   build-depends: stm
   build-depends: text
+  build-depends: time
   build-depends: unix >= 2.7.0.1
   build-depends: unordered-containers
   hs-source-dirs: src

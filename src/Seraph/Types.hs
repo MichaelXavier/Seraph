@@ -59,8 +59,12 @@ instance Monoid Config where
 data Directive = SpawnProg Program
                | KillProg ProgramId deriving (Show, Eq)
 
+makePrisms ''Directive
+
 data Directives = Directives [Directive]
                 | FinalDirectives [Directive] deriving (Show, Eq)
+
+makePrisms ''Directives
 
 data SpawnError = InvalidExec
                 | InvalidUser
@@ -72,6 +76,8 @@ data Event = NewConfig Config
            | ProgRunning ProgramId
            | ProgNotStarted ProgramId SpawnError
            | ShutdownRequested deriving (Show, Eq)
+
+makePrisms ''Event
 
 newtype LogCtx = LogCtx { _ctx :: String }
 
