@@ -52,7 +52,7 @@ parseProg prid rc = do
 expandByCount :: ProgramId -> RawConfig -> Int -> Either ConfigError [Program]
 expandByCount basePrid rc count = forM prids $ \prid -> do
   exec'       <- lookupRequiredString      "exec"      rc
-  delay'      <- lookupOptionalMaybeInt    "delay"     rc
+  delay'      <- lookupIntWithDefault      "delay"     rc 1
   userName'   <- lookupOptionalMaybeString "user"      rc
   groupName'  <- lookupOptionalMaybeString "group"     rc
   stdout'     <- lookupOptionalMaybeString "stdout"    rc

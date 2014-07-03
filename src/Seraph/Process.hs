@@ -80,19 +80,22 @@ runSeraphProcessM = iterM run
     run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (void $ runSeraphChildM m))
     run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus block stopped i)
     block = True
-    stopped = True
+    stopped = False
     try' = fmap hush . tryIOError
     liftTry = liftIO . try'
 
---TODO: check process before hardkill
 kill :: ProcessHandle -> SeraphProcessM ()
 kill ph = do
   softKill
   case ph ^. policy of
-    HardKill n -> waitSecs n >> hardKill
+    HardKill n -> waitSecs n >> hardKillIfRunning
     _          -> return ()
   where
     softKill = signalProcess sigTERM $ ph ^. pid
+    hardKillIfRunning = do
+      ps <- getProcessStatus (ph ^. pid)
+      --TODO: testme
+      when (isNothing ps) hardKill
     hardKill = signalProcess sigKILL $ ph ^. pid
 
 waitOn :: ProcessHandle -> SeraphProcessM ProcessStatus
@@ -105,6 +108,7 @@ spawnProg prog = runEitherT $ do
   (cmd, args) <- failWith InvalidExec $ prog ^. exec ^? cmdSplit
   uid <- getId progUid userName
   gid <- getId progGid groupName
+  waitSecs $ prog ^. delay
   pd <- lift $ forkProcess $ do
     mRun uid setUserID -- can mRuns be handled in maybeT that doesn't abort early?
     mRun gid setGroupID

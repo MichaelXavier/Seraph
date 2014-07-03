@@ -6,6 +6,7 @@ module Seraph.Types ( Config(..)
                     , Program(..)
                     , HasProgram(..)
                     , Directive(..)
+                    , Directives(..)
                     , Event(..)
                     , LogCtx(..)
                     , HasLogCtx(..)
@@ -31,7 +32,7 @@ makeClassy ''ProgramId
 data Program = Program {
   _name       :: ProgramId,
   _exec       :: String,
-  _delay      :: Maybe Int,
+  _delay      :: Int,
   _userName   :: Maybe String,
   _groupName  :: Maybe String,
   _stdout     :: Maybe FilePath,
@@ -55,9 +56,15 @@ instance Monoid Config where
   c1 `mappend` c2 = c1 & configured <>~ c2 ^. configured
                        & running    <>~ c2 ^. running
 
-data Directive = SpawnProgs [Program]
-               | KillProgs [ProgramId]
-               | Exit deriving (Show, Eq)
+data Directive = SpawnProg Program
+               | KillProg ProgramId deriving (Show, Eq)
+
+makePrisms ''Directive
+
+data Directives = Directives [Directive]
+                | FinalDirectives [Directive] deriving (Show, Eq)
+
+makePrisms ''Directives
 
 data SpawnError = InvalidExec
                 | InvalidUser
@@ -69,6 +76,8 @@ data Event = NewConfig Config
            | ProgRunning ProgramId
            | ProgNotStarted ProgramId SpawnError
            | ShutdownRequested deriving (Show, Eq)
+
+makePrisms ''Event
 
 newtype LogCtx = LogCtx { _ctx :: String }
 

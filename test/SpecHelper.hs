@@ -37,5 +37,11 @@ $(derive makeArbitrary ''ProgramId)
 $(derive makeArbitrary ''Program)
 $(derive makeArbitrary ''Config)
 
+instance Arbitrary SpawnError where
+  arbitrary = oneof [ pure InvalidExec
+                    , pure InvalidUser
+                    , pure InvalidGroup
+                    , pure $ SpawnException undefined]-- whats an IOError?
+
 debug :: Show a => a -> a
 debug x = traceShow x x
