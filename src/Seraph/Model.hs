@@ -50,7 +50,7 @@ oracle (ProcessDeath prid) = do
   existing <- gets $ view $ running . at prid . to isJust
   mainLogger $ if existing
      then "Spawning " ++ prid ^. pidStr
-     else "Process " ++ prid ^. pidStr ++ " not configured for restart "
+     else "Process " ++ prid ^. pidStr ++ " not configured for restart"
   modify $ set (running . at prid) Nothing
   progs <- gets $ toListOf $ configured . ix prid
   return $ Directives $ if null progs
