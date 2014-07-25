@@ -166,11 +166,9 @@ monitor out prid = do
 --FIXME: if we couldn't actually kill the program, should we send ended?
 kill' :: TQueue DownstreamMsg -> ProgramId -> ViewM ()
 kill' out prid = do
-  vsv <- ask
   mph <- getHandle prid
   mRun mph $ \ph -> liftIO $ do
     runSeraphProcessM $ kill ph
-    progEnded out prid vsv
 
 --TODO: logging
 progEnded :: TQueue DownstreamMsg -> ProgramId -> TVar ViewState -> IO ()

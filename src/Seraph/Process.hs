@@ -37,7 +37,7 @@ import Seraph.Free
 import Seraph.Types
 import Seraph.Util
 
---import Debug.Trace
+import Debug.Trace
 {-
 spawning a program needs to handle these cases:
 
@@ -70,6 +70,8 @@ runSeraphChildM  = iterM run
     searchPath                          = True
     liftIO' = liftIO . tryIOError
 
+--FIXME: why would process status not be available. don't get the WNOHANG part
+-- disabling blocking is doing weird thing: unclear if it actually waits for anything, triggers process death twice
 runSeraphProcessM :: MonadIO m => SeraphProcessM a -> m a
 runSeraphProcessM = iterM run
   where
@@ -78,8 +80,8 @@ runSeraphProcessM = iterM run
     run (GetUserEntryForName n next)   = next . fmap userID =<< liftTry (P.getUserEntryForName n)
     run (GetGroupEntryForName n next)  = next . fmap groupID  =<< liftTry (P.getGroupEntryForName n)
     run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (void $ runSeraphChildM m))
-    run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus block stopped i)
-    block = True
+    run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus blockIfStillRunning stopped i)
+    blockIfStillRunning = False
     stopped = False
     try' = fmap hush . tryIOError
     liftTry = liftIO . try'
@@ -91,11 +93,11 @@ kill ph = do
     HardKill n -> waitSecs n >> hardKillIfRunning
     _          -> return ()
   where
-    softKill = signalProcess sigTERM $ ph ^. pid
+    softKill = trace "softkill" $ signalProcess sigTERM $ ph ^. pid
     hardKillIfRunning = do
-      ps <- getProcessStatus (ph ^. pid)
+      ps <- trace "checking" $ getProcessStatus (ph ^. pid)
       --TODO: testme
-      when (isNothing ps) hardKill
+      trace "done checking" $ when (isNothing ps) hardKill
     hardKill = signalProcess sigKILL $ ph ^. pid
 
 waitOn :: ProcessHandle -> SeraphProcessM ProcessStatus
