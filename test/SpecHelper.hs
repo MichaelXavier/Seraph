@@ -1,30 +1,35 @@
 {-# LANGUAGE TemplateHaskell #-}
 module SpecHelper ( module X
-                  , debug ) where
+                  , debug
+                  , shouldReturn
+                  , sequenceTests ) where
 
+import           Control.Applicative as X
+import           Control.Concurrent.STM as X
+import qualified Control.Concurrent.MSem as MSem
+import           Control.Error as X hiding ((??))
+import           Control.Lens as X hiding (elements)
+import           Control.Monad.Free as X
+import           Control.Monad.Reader.Class as X
+import           Control.Monad.State.Strict as X
+import           Control.Monad.Writer.Strict as X
 import qualified Data.Map as X (Map)
-import Debug.Trace as X
-import Control.Applicative as X
-import Test.Tasty as X
-import Test.Tasty.HUnit as X
-import Test.Tasty.QuickCheck as X
-import Control.Lens as X hiding (elements)
-import Control.Monad.Free as X
-import Control.Monad.Reader.Class as X
-import Control.Monad.State.Strict as X
-import Control.Monad.Writer.Strict as X
-import Data.Maybe as X
-import Seraph.Types as X
-import System.Posix.Signals as X
-import System.Posix.User as X hiding (groupName, userName)
-import System.Posix.Process as X
-import System.Posix.Types as X
+import           Data.Maybe as X
+import           Debug.Trace as X
+import           Seraph.Types as X
+import           System.Posix.Process as X
+import           System.Posix.Signals as X
+import           System.Posix.Types as X
+import           System.Posix.User as X hiding (groupName, userName)
+import           Test.Tasty as X
+import           Test.Tasty.HUnit as X
+import           Test.Tasty.QuickCheck as X
 
-import Data.DeriveTH (derive)
-import Data.Derive.Arbitrary (makeArbitrary)
-import Data.Map (Map)
+import           Data.DeriveTH (derive)
+import           Data.Derive.Arbitrary (makeArbitrary)
+import           Data.Map (Map)
 import qualified Data.Map as M
-import Data.Set (Set)
+import           Data.Set (Set)
 import qualified Data.Set as S
 
 instance (Arbitrary k, Ord k, Arbitrary v) => Arbitrary (Map k v) where
@@ -45,3 +50,18 @@ instance Arbitrary SpawnError where
 
 debug :: Show a => a -> a
 debug x = traceShow x x
+
+shouldReturn :: (Show a, Eq a) => IO a -> a -> Assertion
+shouldReturn action expected = (@?= expected) =<< action
+
+-- ehhhhh
+sequenceTests :: ((IO a -> IO a) -> TestTree) -> TestTree
+sequenceTests f = withResource (MSem.new 1) (const noop) wrapTree
+  where
+    wrapTree :: IO (MSem.MSem Int) -> TestTree
+    wrapTree semInIO = f $ \action -> do --todo: applicative
+      sem <- semInIO
+      MSem.with sem action
+
+noop :: Monad m => m ()
+noop = return ()

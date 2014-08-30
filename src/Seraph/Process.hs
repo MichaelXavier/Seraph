@@ -5,39 +5,43 @@ module Seraph.Process ( waitOn
                       , runSeraphChildM
                       , runSeraphProcessM ) where
 
-import Control.Applicative
-import Control.Concurrent
-import Control.Lens
-import Control.Monad
-import Control.Monad.Free (iterM)
-import Control.Monad.Trans
-import Control.Error
-import Data.Monoid
-import System.IO.Error (tryIOError)
+import           Control.Applicative
+import           Control.Concurrent
+import           Control.Error
+import           Control.Lens
+import           Control.Monad
+import           Control.Monad.Free (iterM)
+import           Control.Monad.Trans
+import           Data.Monoid
+import           System.Exit (ExitCode(..))
+import System.IO.Error ( tryIOError
+                       , catchIOError
+                       , isDoesNotExistError)
+import qualified System.Posix.Directory as P
+import qualified System.Posix.Env as P
 import System.Posix.IO ( stdOutput
                        , stdError
                        , OpenFileFlags(..)
                        , defaultFileFlags
                        , OpenMode(WriteOnly) )
-import System.Posix.Process (ProcessStatus)
-import System.Posix.User ( UserEntry(userID)
-                         , GroupEntry(groupID) )
-import qualified System.Posix.Directory as P
-import qualified System.Posix.Env as P
 import qualified System.Posix.IO as P
+import           System.Posix.Process (ProcessStatus(..))
 import qualified System.Posix.Process as P
-import qualified System.Posix.Signals as P
-import qualified System.Posix.User as P
 import System.Posix.Signals ( sigTERM
                             , sigKILL )
+import qualified System.Posix.Signals as P
 import System.Posix.Types ( UserID
-                          , GroupID )
+                          , GroupID
+                          , ProcessID )
+import           System.Posix.User ( UserEntry(userID)
+                         , GroupEntry(groupID) )
+import qualified System.Posix.User as P
 
-import Seraph.Free
-import Seraph.Types
-import Seraph.Util
+import           Seraph.Free
+import           Seraph.Types
+import           Seraph.Util
 
-import Debug.Trace
+import           Debug.Trace
 {-
 spawning a program needs to handle these cases:
 
@@ -80,11 +84,17 @@ runSeraphProcessM = iterM run
     run (GetUserEntryForName n next)   = next . fmap userID =<< liftTry (P.getUserEntryForName n)
     run (GetGroupEntryForName n next)  = next . fmap groupID  =<< liftTry (P.getGroupEntryForName n)
     run (ForkProcess m next)           = next =<< liftIO (P.forkProcess (void $ runSeraphChildM m))
-    run (GetProcessStatus i next)      = next =<< liftIO (P.getProcessStatus blockIfStillRunning stopped i)
+    run (GetProcessStatus i next)      = next =<< liftIO (safeGetProcessStatus blockIfStillRunning stopped i)
     blockIfStillRunning = False
     stopped = False
     try' = fmap hush . tryIOError
     liftTry = liftIO . try'
+
+safeGetProcessStatus :: Bool -> Bool -> ProcessID -> IO (Maybe ProcessStatus)
+safeGetProcessStatus blockIfStillRunning stopped i = catchAlreadyGone $ P.getProcessStatus blockIfStillRunning stopped i
+  where
+    -- damn lies? what does nothing mean
+    catchAlreadyGone x = x `catchIOError` catchIOErrorWith isDoesNotExistError (Just (Exited ExitSuccess))
 
 kill :: ProcessHandle -> SeraphProcessM ()
 kill ph = do
@@ -93,7 +103,7 @@ kill ph = do
     HardKill n -> waitSecs n >> hardKillIfRunning
     _          -> return ()
   where
-    softKill = trace "softkill" $ signalProcess sigTERM $ ph ^. pid
+    softKill = traceShow ("softkill", ph) $ signalProcess sigTERM $ ph ^. pid
     hardKillIfRunning = do
       ps <- trace "checking" $ getProcessStatus (ph ^. pid)
       --TODO: testme
@@ -154,3 +164,7 @@ cmdSplit = prism joinParts splitParts
     splitParts str = case words str of
                        (s:as) -> Right (s, as)
                        _      -> Left str
+
+catchIOErrorWith :: (IOError -> Bool) -> a -> IOError -> IO a
+catchIOErrorWith p v e | p e       = return v
+                       | otherwise = ioError e

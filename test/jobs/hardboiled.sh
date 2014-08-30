@@ -7,5 +7,6 @@ interrupted()
 }
 
 trap interrupted SIGTERM
-echo "chillin"
+echo "$$ chillin"
+echo -n $$ > hardboiled.pid
 while true; do sleep 1; done

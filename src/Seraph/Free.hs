@@ -1,21 +1,17 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor    #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 module Seraph.Free where
 
-import Prelude hiding (log)
-import Control.Exception
-import System.Posix.IO ( OpenMode
-                       , OpenFileFlags )
-import System.Posix.Process ( ProcessStatus )
-import System.Posix.Types ( ProcessID
-                          , GroupID
-                          , UserID
-                          , Fd )
-import System.Posix.Signals ( Signal )
+import           Control.Exception
+import           Prelude               hiding (log)
+import           System.Posix.IO       (OpenFileFlags, OpenMode)
+import           System.Posix.Process  (ProcessStatus)
+import           System.Posix.Signals  (Signal)
+import           System.Posix.Types    (Fd, GroupID, ProcessID, UserID)
 
-import Control.Monad.Free
-import Control.Monad.Free.TH
+import           Control.Monad.Free
+import           Control.Monad.Free.TH
 
 data SeraphView next = Log String next deriving (Functor)
 

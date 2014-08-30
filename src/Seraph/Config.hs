@@ -1,30 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes        #-}
 module Seraph.Config ( load
                      , ConfigError(..) ) where
 
-import Control.Applicative
-import Control.Lens hiding (coerce)
-import Control.Error
-import Control.Exception ( SomeException
-                         , try )
-import Control.Monad
-import Control.Monad.Trans
-import qualified Data.Configurator as C
-import Data.Configurator.Types ( Name
-                               , Value(..)
-                               , Worth(..))
-import Data.Hashable (Hashable)
-import qualified Data.Map as M
-import Data.Monoid
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
-import qualified Data.Text as T
-import Data.Text.Lens (unpacked)
-import Data.Text.Strict.Lens (packed)
+import           Control.Applicative
+import           Control.Error
+import           Control.Exception       (SomeException, try)
+import           Control.Lens            hiding (coerce)
+import           Control.Monad
+import           Control.Monad.Trans
+import qualified Data.Configurator       as C
+import           Data.Configurator.Types (Name, Value (..), Worth (..))
+import           Data.Hashable           (Hashable)
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as HM
+import qualified Data.Map                as M
+import           Data.Monoid
+import qualified Data.Text               as T
+import           Data.Text.Lens          (unpacked)
+import           Data.Text.Strict.Lens   (packed)
 
-import Seraph.Types
-import Seraph.Util
+import           Seraph.Types
+import           Seraph.Util
 
 type RawConfig = HashMap Name Value
 

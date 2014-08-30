@@ -50,19 +50,28 @@ test-suite spec
   hs-source-dirs: src, test
   build-depends: HUnit
   build-depends: QuickCheck
+  build-depends: async
   build-depends: base >=4.6
+  build-depends: configurator >= 0.2.0.2
   build-depends: containers
-  build-depends: errors
   build-depends: derive
+  build-depends: errors
   build-depends: free
   build-depends: hashable
   build-depends: lens
   build-depends: mtl
   build-depends: mvc
+  build-depends: old-locale
+  build-depends: pipes
+  build-depends: SafeSemaphore
+  build-depends: split
+  build-depends: stm
+  build-depends: text
+  build-depends: time
+  build-depends: unix >= 2.7.0.1
+  build-depends: unordered-containers
   build-depends: tasty
   build-depends: tasty-hunit
   build-depends: tasty-quickcheck
-  build-depends: text
-  build-depends: unix >= 2.7.0.1
-  build-depends: unordered-containers
-  ghc-options: -threaded -with-rtsopts=-N4
+  ghc-options: -threaded -with-rtsopts=-N
+  default-language: Haskell2010

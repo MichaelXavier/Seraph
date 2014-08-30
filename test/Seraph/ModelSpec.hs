@@ -14,7 +14,7 @@ oracleTests = testGroup "oracle" [
       let cfg' = removeFromConfig cfg prid
           res  = runOracle (ProcessDeath prid) cfg'
           diedMsg = (prid ^. pidStr) ++ " - Process died"
-          unknownMsg = "seraph - process " ++ prid ^. pidStr ++ " not configured for restart"
+          unknownMsg = "seraph - Process " ++ prid ^. pidStr ++ " not configured for restart"
           expectedLogs = [diedMsg, unknownMsg]
       in res == (Directives [], expectedLogs, cfg')
   , testProperty "Dead process never in running" $ \prid cfg ->

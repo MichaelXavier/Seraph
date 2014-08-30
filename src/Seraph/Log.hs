@@ -1,9 +1,9 @@
 module Seraph.Log (getFormattedTime) where
 
-import Control.Applicative
-import Data.Time.LocalTime
-import Data.Time.Format (formatTime)
-import System.Locale (defaultTimeLocale)
+import           Control.Applicative
+import           Data.Time.Format    (formatTime)
+import           Data.Time.LocalTime
+import           System.Locale       (defaultTimeLocale)
 
 getFormattedTime :: IO String
 getFormattedTime = cleanCalendar <$> getZonedTime

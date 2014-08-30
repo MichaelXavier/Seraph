@@ -1,19 +1,17 @@
 module Main (main) where
 
-import Control.Error
-import Control.Monad (void)
-import Control.Monad.Trans (lift)
-import Data.Monoid (mempty)
-import System.Environment (getArgs)
-import MVC (runMVC)
-import System.Exit
-import System.IO ( stderr
-                 , hPutStrLn )
+import           Control.Error
+import           Control.Monad       (void)
+import           Control.Monad.Trans (lift)
+import           Data.Monoid         (mempty)
+import           MVC                 (runMVC)
+import           System.Environment  (getArgs)
+import           System.Exit
+import           System.IO           (hPutStrLn, stderr)
 
-import Seraph.Config ( load
-                     , ConfigError )
-import Seraph.Core (core)
-import Seraph.Model (oracleModel)
+import           Seraph.Config       (ConfigError, load)
+import           Seraph.Core         (core)
+import           Seraph.Model        (oracleModel)
 
 main :: IO ()
 main = do

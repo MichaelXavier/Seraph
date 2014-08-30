@@ -6,22 +6,22 @@ module Seraph.Model ( Directive(..)
                     , oracleDebug
                     ) where
 
+import           Control.Lens
+import           Control.Monad.State.Strict
+import           Control.Monad.Writer.Strict
+import qualified Data.Map as M
 import Data.Maybe ( isJust
                   , mapMaybe
                   )
-import Control.Lens
-import Control.Monad.State.Strict
-import Control.Monad.Writer.Strict
-import Data.Set ( (\\)
+import           Data.Set ( (\\)
                 , Set
                 )
 import qualified Data.Set as S
-import qualified Data.Map as M
-import MVC
+import           MVC
 
-import Debug.Trace
+import           Debug.Trace
 
-import Seraph.Types
+import           Seraph.Types
 
 oracleModel :: Model Config Event (Directives, [String])
 oracleModel = asPipe $ loop model

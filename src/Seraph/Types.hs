@@ -18,8 +18,8 @@ module Seraph.Types ( Config(..)
                     ) where
 
 import Control.Lens
-import Data.Monoid
 import Data.Map (Map)
+import Data.Monoid
 import Data.Set (Set)
 import System.Posix.Types (ProcessID)
 
@@ -41,7 +41,7 @@ data Program = Program {
   _logExec    :: Maybe String,
   _pidFile    :: Maybe FilePath,
   _env        :: [(String, String)],
-  _termGrace  :: Maybe Int -- ^ How long to wait after sending a SIGTERM before SIGKILL. Nothing = never SIGKILL. Default Nothing
+  _termGrace  :: Maybe Int -- ^ How long to wait in seconds after sending a SIGTERM before SIGKILL. Nothing = never SIGKILL. Default Nothing
 } deriving (Show, Eq, Ord)
 
 makeClassy ''Program

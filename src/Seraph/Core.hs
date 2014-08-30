@@ -1,5 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Seraph.Core (core) where
+module Seraph.Core (
+                     core
+                    -- * Exported for testing
+                   , processDirectives
+                   , ViewState(..)
+                   , HasViewState(..)
+                   , DownstreamMsg(..)
+                   ) where
 
 import Control.Lens
 import Control.Applicative
