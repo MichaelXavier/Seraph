@@ -9,3 +9,4 @@
 *** TODO numbering expansion (i.e. counts) not working right
     spawning and removing a count of process "foo" will complain unknown process foo-1
 *** TODO ensure that logger processes get killed like in upstream
+*** TODO ensure the timing constraint in testing is not an issue
