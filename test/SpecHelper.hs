@@ -2,7 +2,9 @@
 module SpecHelper ( module X
                   , debug
                   , shouldReturn
-                  , sequenceTests ) where
+                  , sequenceTests
+                  , cleanPids
+                  , pidFiles) where
 
 import           Control.Applicative as X
 import           Control.Concurrent.STM as X
@@ -17,6 +19,8 @@ import qualified Data.Map as X (Map)
 import           Data.Maybe as X
 import           Debug.Trace as X
 import           Seraph.Types as X
+import           System.IO.Error
+import           System.Posix.Files
 import           System.Posix.Process as X
 import           System.Posix.Signals as X
 import           System.Posix.Types as X
@@ -65,3 +69,8 @@ sequenceTests f = withResource (MSem.new 1) (const noop) wrapTree
 
 noop :: Monad m => m ()
 noop = return ()
+
+cleanPids = mapM_ (tryIOError . removeLink) pidFiles
+
+pidFiles :: [FilePath]
+pidFiles = ["test/jobs/pushover.pid", "test/jobs/hardboiled.pid"]

@@ -70,7 +70,7 @@ runSeraphChildM  = iterM run
       next =<< liftIO' (P.executeFile f searchPath as (Just (existingEnv <> e)))
     run (OpenFd p m fs next)            = next =<< liftIO' (P.openFd p m fmode fs)
     run (DupTo fd1 fd2 next)            = liftIO' (P.dupTo fd1 fd2) >> next
-    fmode                               = Just 666
+    fmode                               = Just 0o664
     searchPath                          = True
     liftIO' = liftIO . tryIOError
 
@@ -103,11 +103,11 @@ kill ph = do
     HardKill n -> waitSecs n >> hardKillIfRunning
     _          -> return ()
   where
-    softKill = traceShow ("softkill", ph) $ signalProcess sigTERM $ ph ^. pid
+    softKill = signalProcess sigTERM $ ph ^. pid
     hardKillIfRunning = do
-      ps <- trace "checking" $ getProcessStatus (ph ^. pid)
+      ps <- getProcessStatus (ph ^. pid)
       --TODO: testme
-      trace "done checking" $ when (isNothing ps) hardKill
+      when (isNothing ps) hardKill
     hardKill = signalProcess sigKILL $ ph ^. pid
 
 waitOn :: ProcessHandle -> SeraphProcessM ProcessStatus
@@ -127,6 +127,7 @@ spawnProg prog = runEitherT $ do
     mRun (prog ^. workingDir) changeWorkingDirectory
     configureFDs prog
     void $ executeFile cmd args (prog ^. env)
+  -- TODO: this fixes the test failure and i don't know why
   return $ ProcessHandle pd $ prog ^. to killPolicy
   where
     getId f reader = case prog ^. reader of
@@ -135,14 +136,14 @@ spawnProg prog = runEitherT $ do
 
 configureFDs :: Program -> SeraphChildM ()
 configureFDs prog
-  | logProg  = undefined
+  | logProg  = undefined --TODO
   | otherwise = do
     logToFile stdOutput $ fromMaybe devNull (prog ^. stdout)
     logToFile stdError $ fromMaybe devNull (prog ^. stderr)
   where
     logProg  = prog ^. logExec . to isJust
     logToFile existingFd fp = do
-      --FIXME
+      --TODO handle errors appropriately
       Right targetFd <- openFd fp WriteOnly defaultFileFlags { append = True }
       void $ dupTo targetFd existingFd
     devNull = "/dev/null"

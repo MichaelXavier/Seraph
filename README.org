@@ -8,3 +8,4 @@
     Config changes should kill first before modifying the config
 *** TODO numbering expansion (i.e. counts) not working right
     spawning and removing a count of process "foo" will complain unknown process foo-1
+*** TODO ensure that logger processes get killed like in upstream

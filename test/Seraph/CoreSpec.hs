@@ -1,9 +1,10 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Seraph.CoreSpec (tests) where
 
+import Control.Concurrent
 import Control.Exception.Base
 import Seraph.Core
 import System.IO.Error
-import System.Posix.Files
 import System.Timeout (timeout)
 
 import SpecHelper
@@ -44,6 +45,8 @@ processDirectivesTests = sequenceTests $ \sync ->
        q  <- buildQueue
        let prog = hardboiledDontAbort
        processDirectives vs q $ Directives [SpawnProg prog]
+       threadDelay 500000
+       putStrLn "finished processing"
        Just pid <- getPid vs prog
        processDirectives vs q $ Directives [KillProg (prog ^. name)]
        shouldKeepRunning pid
@@ -54,8 +57,6 @@ shouldStopRunning pid = pidRunning pid `shouldEventuallyBe` False
 
 shouldEventuallyBe action value =
   checkTil (== value) action `shouldReturn` (Just value)
-  where
-    secs = 5
 
 checkTil :: (a -> Bool) -> IO a -> IO (Maybe a)
 checkTil p x = timeout eventuallyInUs check
@@ -83,23 +84,27 @@ getPid vs prog = atomically (fmap (view pid) . findPid <$> readTVar vs)
   where
     findPid vs' = vs' ^. pHandles . at (prog ^. name)
 
-pushover = Program (ProgramId "pushover")
-                   "test/jobs/pushover.sh"
-                   0
-                   Nothing
-                   Nothing
-                   Nothing
-                   Nothing
-                   Nothing
-                   Nothing
-                   Nothing
-                   mempty
-                   Nothing
+pushover = Program {
+      _name       = (ProgramId "pushover")
+    , _exec       = "test/jobs/pushover.sh"
+    , _delay      = 0
+    , _userName   = Nothing
+    , _groupName  = Nothing
+    , _stdout     = Just "test/jobs/pushover.stdout.log"
+    , _stderr     = Just "test/jobs/pushover.stderr.log"
+    , _workingDir = Nothing
+    , _logExec    = Nothing
+    , _pidFile    = Nothing
+    , _env        = mempty
+    , _termGrace  = Nothing
+    }
 
 hardboiled = hardboiledDontAbort & termGrace .~ Just 1
 
 hardboiledDontAbort = pushover & name .~ (ProgramId "hardboiled")
                                & exec .~ "test/jobs/hardboiled.sh"
+                               & stdout .~ Just "test/jobs/hardboiled.stdout.log"
+                               & stderr .~ Just "test/jobs/hardboiled.stderr.log"
 
 --TODO: write pids, reap them, then delete files
 withCleanup t = t `finally` cleanUp
@@ -114,8 +119,3 @@ loadPid :: FilePath -> IO (Maybe ProcessID)
 loadPid f = (readMay <$> readFile f) `catchIOError` handler
   where
     handler _ = return Nothing
-
-cleanPids = mapM_ (tryIOError . removeLink) pidFiles
-
-pidFiles :: [FilePath]
-pidFiles = ["test/jobs/pushover.pid", "test/jobs/hardboiled.pid"]
