@@ -6,6 +6,7 @@ import Test.Tasty
 import Seraph.CoreSpec
 import Seraph.ModelSpec
 import Seraph.ProcessSpec
+import Seraph.TypesSpec
 
 import SpecHelper
 
@@ -16,5 +17,6 @@ main = run `finally` cleanup
       [ Seraph.ModelSpec.tests
       , Seraph.CoreSpec.tests
       , Seraph.ProcessSpec.tests
+      , Seraph.TypesSpec.tests
       ]
     cleanup = cleanPids

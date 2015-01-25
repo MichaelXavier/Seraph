@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module SpecHelper ( module X
                   , debug
                   , shouldReturn
@@ -51,6 +52,25 @@ instance Arbitrary SpawnError where
                     , pure InvalidUser
                     , pure InvalidGroup
                     , pure $ SpawnException undefined]-- whats an IOError?
+
+
+instance Arbitrary Event where
+  arbitrary = oneof [ NewConfig <$> arbitrary
+                    , ProcessDeath <$> arbitrary
+                    , ProgRunning <$> arbitrary
+                    , ProgNotStarted <$> arbitrary <*> arbitrary
+                    , pure ShutdownRequested
+                    ]
+
+instance Arbitrary Directive where
+  arbitrary = oneof [ SpawnProg <$> arbitrary
+                    , KillProg <$> arbitrary
+                    ]
+
+instance Arbitrary Directives where
+  arbitrary = oneof [ Directives <$> arbitrary
+                    , FinalDirectives <$> arbitrary
+                    ]
 
 debug :: Show a => a -> a
 debug x = traceShow x x

@@ -64,6 +64,14 @@ makePrisms ''Directive
 data Directives = Directives [Directive]
                 | FinalDirectives [Directive] deriving (Show, Eq)
 
+--TODO: proof
+instance Monoid Directives where
+  mempty = Directives mempty
+  (Directives as) `mappend` (Directives bs) = Directives $ as `mappend` bs
+  (Directives as) `mappend` (FinalDirectives bs) = FinalDirectives $ as `mappend` bs
+  (FinalDirectives as) `mappend` (FinalDirectives bs) = FinalDirectives $ as `mappend` bs
+  (FinalDirectives as) `mappend` (Directives bs) = FinalDirectives $ as `mappend` bs
+
 makePrisms ''Directives
 
 data SpawnError = InvalidExec

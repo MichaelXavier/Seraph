@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Seraph.Model ( Directive(..)
                     , Event(..)
+                    , OracleM
                     , oracle
                     , oracleModel
                     , oracleDebug

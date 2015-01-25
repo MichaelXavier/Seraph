@@ -1,9 +1,12 @@
 module Seraph.ModelSpec (tests) where
 
+import Control.Applicative
 import qualified Data.Set as S
+import qualified Data.Map as M
 import SpecHelper
 
 import Seraph.Model
+import Seraph.Types
 
 tests :: TestTree
 tests = testGroup "Seraph.Model" [oracleTests]
@@ -42,12 +45,42 @@ oracleTests = testGroup "oracle" [
      let pns = ProgNotStarted prid e
          (Directives ds, _, _) = runOracle pns cfg
      in length ds <= 1 && all isSpawn ds
-  -- , testProperty "any sequence of events exept a new config will not modify configured programs" $ \cfg evts ->
-  --    undefined
-  -- , testProperty "any sequence of events exept a new config will not launch a directive for a program not in the config" $ \cfg evts ->
-  --    undefined
+  , testProperty "any sequence of events exept a new config or shutdown will not modify configured programs" $ \cfg evts ->
+     let evts' = filter (not . (isNewConfig <||> isShutdownRequested)) evts
+         cfg' = execState (runWriterT (runEvents evts')) cfg
+     in cfg' ^. configured === cfg ^. configured
+  , testProperty "any sequence of events exept a new config will not launch a directive for a program not in the config" $ \cfg evts ->
+     let evts' = filter (not . isNewConfig) evts
+         ds = evalState (fst <$> runWriterT (runEvents evts')) cfg
+         progs = S.fromList $ getProgs ds
+         pids = S.fromList $ getPids ds
+         origProgs = S.fromList $ M.elems (cfg ^. configured)
+         origPids = S.fromList $ M.keys (cfg ^. configured) ++ S.toList (cfg ^. running)
+     in progs === origProgs .&&. pids === origPids
   --TODO: given a reasonable (or empty) config, any list of operations will never result in mismapped ProgIds
                                  ]
+
+
+--TODO: lens
+unDirectives :: Directives -> [Directive]
+unDirectives (Directives ds) = ds
+unDirectives (FinalDirectives ds) = ds
+
+
+--TODO: prism
+getProgs :: Directives -> [Program]
+getProgs = catMaybes . fmap go . unDirectives
+  where
+    go (SpawnProg p) = Just p
+    go _ = Nothing
+
+
+getPids :: Directives -> [ProgramId]
+getPids = catMaybes . fmap go . unDirectives
+  where
+    go (KillProg p) = Just p
+    go _ = Nothing
+
 
 --TODO: use prisms
 isSpawn :: Directive -> Bool
@@ -58,6 +91,16 @@ isFinal :: Directives -> Bool
 isFinal (FinalDirectives _) = True
 isFinal _                   = False
 
+
+isNewConfig :: Event -> Bool
+isNewConfig (NewConfig _) = True
+isNewConfig _             = False
+
+isShutdownRequested :: Event -> Bool
+isShutdownRequested ShutdownRequested = True
+isShutdownRequested _                 = False
+
+
 removeFromConfig :: Config -> ProgramId -> Config
 removeFromConfig cfg prid = cfg & configured . at prid .~ Nothing
                                & running . at prid .~ Nothing
@@ -66,3 +109,10 @@ runOracle :: Event -> Config -> (Directives, [String], Config)
 runOracle e cfg = (ds, ls, cfg')
   where
     ((ds, ls), cfg') = runState (runWriterT (oracle e)) cfg
+
+
+runEvents :: [Event] -> OracleM Directives
+runEvents evts = mconcat <$> mapM oracle evts
+
+
+(<||>) = liftA2 (||)
