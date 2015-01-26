@@ -1,5 +1,8 @@
-module Main (main) where
+module Main
+    ( main
+    ) where
 
+-------------------------------------------------------------------------------
 import           Control.Error
 import           Control.Monad       (void)
 import           Control.Monad.Trans (lift)
@@ -8,10 +11,11 @@ import           MVC                 (runMVC)
 import           System.Environment  (getArgs)
 import           System.Exit
 import           System.IO           (hPutStrLn, stderr)
-
+-------------------------------------------------------------------------------
 import           Seraph.Config       (ConfigError, load)
 import           Seraph.Core         (core)
 import           Seraph.Model        (oracleModel)
+-------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
@@ -26,8 +30,12 @@ main = do
     bail (InvalidConfig e) = errorExit ("Invalid config " ++ show e)
     load' fp = hoistEither . fmapL InvalidConfig =<< lift (load fp)
 
+
+-------------------------------------------------------------------------------
 data BootError = NoConfig | InvalidConfig ConfigError
 
+
+-------------------------------------------------------------------------------
 errorExit :: String -> IO ()
 errorExit msg = hPutStrLn stderr msg' >> exitFailure
   where

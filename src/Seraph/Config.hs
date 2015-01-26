@@ -1,8 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
-module Seraph.Config ( load
-                     , ConfigError(..) ) where
+module Seraph.Config
+    ( load
+    , ConfigError(..)
+    ) where
 
+-------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Error
 import           Control.Exception       (SomeException, try)
@@ -19,12 +22,15 @@ import           Data.Monoid
 import qualified Data.Text               as T
 import           Data.Text.Lens          (unpacked)
 import           Data.Text.Strict.Lens   (packed)
-
+-------------------------------------------------------------------------------
 import           Seraph.Types
 import           Seraph.Util
+-------------------------------------------------------------------------------
 
 type RawConfig = HashMap Name Value
 
+
+-------------------------------------------------------------------------------
 --FIXME: doesn't seem to catch parseerrors
 load :: FilePath -> IO (Either ConfigError Config)
 load fp = runEitherT $ do
@@ -34,17 +40,23 @@ load fp = runEitherT $ do
   where
     buildConfigured progs = M.fromList [(p ^. name, p) | p <- progs]
 
+
+-------------------------------------------------------------------------------
 --TODO: don't need a map
 unGroup :: RawConfig -> [(ProgramId, RawConfig)]
 unGroup = map convertKey . splitConfig firstDot
   where
     convertKey (nPrid, rc') = (nPrid ^. namePrid, rc')
 
+
+-------------------------------------------------------------------------------
 parseProg :: ProgramId -> RawConfig -> Either ConfigError [Program]
 parseProg prid rc = do
   count       <- lookupIntWithDefault "count" rc 1
   expandByCount prid rc count
 
+
+-------------------------------------------------------------------------------
 --TODO: nat
 expandByCount :: ProgramId -> RawConfig -> Int -> Either ConfigError [Program]
 expandByCount basePrid rc count = forM prids $ \prid -> do
@@ -74,6 +86,8 @@ expandByCount basePrid rc count = forM prids $ \prid -> do
   where
     prids = [ basePrid & pidStr <>~ ('-':show n) | n <- [1..count]]
 
+
+-------------------------------------------------------------------------------
 firstDot :: Name -> Maybe (Name, Name)
 firstDot n
   | T.null h    = Nothing
@@ -81,6 +95,8 @@ firstDot n
   where
     (h, rest) = T.breakOn "." n & _2 %~ T.drop 1
 
+
+-------------------------------------------------------------------------------
 splitConfig :: (Name -> Maybe (Name, Name)) -> RawConfig -> [(Name, RawConfig)]
 splitConfig splitter = HM.toList . HM.foldrWithKey go mempty
   where
@@ -89,31 +105,49 @@ splitConfig splitter = HM.toList . HM.foldrWithKey go mempty
                    Nothing -> acc
                    Just (master, rest) -> acc & at master <>~ Just (HM.singleton rest v)
 
+
+-------------------------------------------------------------------------------
 lookupRequiredString :: Name -> HashMap Name Value -> Either ConfigError String
 lookupRequiredString k      = coerce k "String" _String <=< lookupRequired k
 
+
+-------------------------------------------------------------------------------
 lookupIntWithDefault :: Name -> HashMap Name Value -> Rational -> Either ConfigError Int
 lookupIntWithDefault k rc d = coerce k "Int" _Number $ fromMaybe (Number d) $ HM.lookup k rc
 
+
+-------------------------------------------------------------------------------
 lookupOptionalMaybeInt :: Name -> HashMap Name Value -> Either ConfigError (Maybe Int)
 lookupOptionalMaybeInt k    = coerceMay k "Int" _Number <=< lookupOptional k
 
+
+-------------------------------------------------------------------------------
 lookupOptionalMaybeString :: Name -> HashMap Name Value -> Either ConfigError (Maybe String)
 lookupOptionalMaybeString k = coerceMay k "String" _String <=< lookupOptional k
 
+
+-------------------------------------------------------------------------------
 lookupRequired :: Name -> HashMap Name b -> Either ConfigError b
 lookupRequired k            = note (MissingKey k) . HM.lookup k
 
+
+-------------------------------------------------------------------------------
 lookupOptional :: (Hashable k, Eq k) => k -> HashMap k v -> Either a (Maybe v)
 lookupOptional k            = Right . HM.lookup k
 
+
+-------------------------------------------------------------------------------
 coerce :: Name -> String -> Simple Prism a b -> a -> Either ConfigError b
 coerce k t p v              = note (WrongType k t) $ v ^? p
 
+
+-------------------------------------------------------------------------------
 coerceMay :: Name -> String -> Simple Prism a b -> Maybe a -> Either ConfigError (Maybe b)
 coerceMay _ _ _ Nothing     = Right Nothing
 coerceMay k t p (Just v)    = Just <$> coerce k t p v
 
+
+-------------------------------------------------------------------------------
 parseEnv :: Name -> RawConfig -> [(String, String)]
 parseEnv k = mapMaybe coercePair . HM.toList . mconcat . justConfigs . splitConfig splitKey
  where
@@ -126,22 +160,29 @@ parseEnv k = mapMaybe coercePair . HM.toList . mconcat . justConfigs . splitConf
      where
        (prefix, postfix) = T.breakOn (k <> ".") n
 
+
+-------------------------------------------------------------------------------
 _String :: Simple Prism Value String
 _String = prism (String . T.pack) coerceString
   where
     coerceString (String s) = Right $ T.unpack s
     coerceString x          = Left x
 
+
+-------------------------------------------------------------------------------
 _Number :: Simple Prism Value Int
 _Number = prism (Number . toRational) coerceNumber
   where
     coerceNumber (Number n) = Right $ truncate n
     coerceNumber x          = Left x
 
+
+-------------------------------------------------------------------------------
 namePrid :: Iso' Name ProgramId
 namePrid = iso (view (unpacked . to ProgramId)) (view (pidStr . packed))
 
+
+-------------------------------------------------------------------------------
 data ConfigError = LoadException SomeException
                  | MissingKey Name
                  | WrongType Name String deriving (Show) -- probably a type error constructor too
-

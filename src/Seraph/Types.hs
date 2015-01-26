@@ -1,32 +1,37 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Seraph.Types ( Config(..)
-                    , HasConfig(..)
-                    , ProgramId(..)
-                    , HasProgramId(..)
-                    , Program(..)
-                    , HasProgram(..)
-                    , Directive(..)
-                    , Directives(..)
-                    , Event(..)
-                    , LogCtx(..)
-                    , HasLogCtx(..)
-                    , SpawnError(..)
-                    , KillPolicy(..)
-                    , ProcessHandle(..)
-                    , HasProcessHandle(..)
-                    , killPolicy
-                    ) where
+module Seraph.Types
+    ( Config(..)
+    , HasConfig(..)
+    , ProgramId(..)
+    , HasProgramId(..)
+    , Program(..)
+    , HasProgram(..)
+    , Directive(..)
+    , Directives(..)
+    , Event(..)
+    , LogCtx(..)
+    , HasLogCtx(..)
+    , SpawnError(..)
+    , KillPolicy(..)
+    , ProcessHandle(..)
+    , HasProcessHandle(..)
+    , killPolicy
+    ) where
 
-import Control.Lens
-import Data.Map (Map)
-import Data.Monoid
-import Data.Set (Set)
-import System.Posix.Types (ProcessID)
+-------------------------------------------------------------------------------
+import           Control.Lens
+import           Data.Map           (Map)
+import           Data.Monoid
+import           Data.Set           (Set)
+import           System.Posix.Types (ProcessID)
+-------------------------------------------------------------------------------
 
 newtype ProgramId = ProgramId { _pidStr :: String} deriving (Show, Eq, Ord)
 
 makeClassy ''ProgramId
 
+
+-------------------------------------------------------------------------------
 --TODO: use real filepaths
 --TODO: uid, guid using getAllGroupEntries
 data Program = Program {
@@ -46,6 +51,8 @@ data Program = Program {
 
 makeClassy ''Program
 
+
+-------------------------------------------------------------------------------
 data Config = Config { _configured :: Map ProgramId Program
                      , _running    :: Set ProgramId
                      } deriving (Show, Eq)
@@ -56,14 +63,20 @@ instance Monoid Config where
   c1 `mappend` c2 = c1 & configured <>~ c2 ^. configured
                        & running    <>~ c2 ^. running
 
+
+-------------------------------------------------------------------------------
 data Directive = SpawnProg Program
                | KillProg ProgramId deriving (Show, Eq)
 
 makePrisms ''Directive
 
+
+-------------------------------------------------------------------------------
 data Directives = Directives [Directive]
                 | FinalDirectives [Directive] deriving (Show, Eq)
 
+
+-------------------------------------------------------------------------------
 --TODO: proof
 instance Monoid Directives where
   mempty = Directives mempty
@@ -74,11 +87,15 @@ instance Monoid Directives where
 
 makePrisms ''Directives
 
+
+-------------------------------------------------------------------------------
 data SpawnError = InvalidExec
                 | InvalidUser
                 | InvalidGroup
                 | SpawnException IOError deriving (Show, Eq)
 
+
+-------------------------------------------------------------------------------
 data Event = NewConfig Config
            | ProcessDeath ProgramId
            | ProgRunning ProgramId
@@ -87,17 +104,25 @@ data Event = NewConfig Config
 
 makePrisms ''Event
 
+
+-------------------------------------------------------------------------------
 newtype LogCtx = LogCtx { _ctx :: String }
 
 makeClassy ''LogCtx
 
+
+-------------------------------------------------------------------------------
 data KillPolicy = SoftKill | HardKill Int deriving (Show, Eq)
 
+
+-------------------------------------------------------------------------------
 data ProcessHandle = ProcessHandle { _pid    :: ProcessID
                                    , _policy :: KillPolicy } deriving (Show, Eq)
 
 makeClassy ''ProcessHandle
 
+
+-------------------------------------------------------------------------------
 killPolicy :: Program -> KillPolicy
 killPolicy Program { _termGrace = Just n } = HardKill n
 killPolicy _                               = SoftKill

@@ -1,28 +1,28 @@
-{-# LANGUAGE FlexibleContexts #-}
-module Seraph.Model ( Directive(..)
-                    , Event(..)
-                    , OracleM
-                    , oracle
-                    , oracleModel
-                    , oracleDebug
-                    ) where
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+module Seraph.Model
+    ( Directive(..)
+    , Event(..)
+    , OracleM
+    , oracle
+    , oracleModel
+    , oracleDebug
+    ) where
 
+-------------------------------------------------------------------------------
 import           Control.Lens
 import           Control.Monad.State.Strict
 import           Control.Monad.Writer.Strict
-import qualified Data.Map as M
-import Data.Maybe ( isJust
-                  , mapMaybe
-                  )
-import           Data.Set ( (\\)
-                , Set
-                )
-import qualified Data.Set as S
-import           MVC
-
+import qualified Data.Map                    as M
+import           Data.Maybe                  (isJust, mapMaybe)
+import           Data.Set                    (Set, (\\))
+import qualified Data.Set                    as S
 import           Debug.Trace
-
+import           MVC
+-------------------------------------------------------------------------------
 import           Seraph.Types
+-------------------------------------------------------------------------------
+
 
 oracleModel :: Model Config Event (Directives, [String])
 oracleModel = asPipe $ loop model
@@ -30,13 +30,19 @@ oracleModel = asPipe $ loop model
     model = unwrapModel oracle
     -- model = unwrapModel oracleDebug
 
+
+-------------------------------------------------------------------------------
 type OracleM a = WriterT [String] (State Config) a
 
+
+-------------------------------------------------------------------------------
 unwrapModel :: (Event -> OracleM a)
             -> Event
             -> ListT (State Config) (a, [String])
 unwrapModel f e = lift $ runWriterT (f e)
 
+
+-------------------------------------------------------------------------------
 oracleDebug :: Event -> OracleM Directives
 oracleDebug e = do
   s <- get
@@ -45,6 +51,8 @@ oracleDebug e = do
   -- traceShow ("EVT", e, "BEFORE", s, "AFTER", s') $ return res
   traceShow ("EVT", e, "RES", res) $ return res
 
+
+-------------------------------------------------------------------------------
 oracle :: Event -> OracleM Directives
 oracle (ProcessDeath prid) = do
   progLogger "Process died"
@@ -91,6 +99,8 @@ oracle (ProgNotStarted prid e) = do
   where
     progLogger = ctxLogger (prid ^. pidStr)
 
+
+-------------------------------------------------------------------------------
 getProgs :: [ProgramId] -> OracleM [Program]
 getProgs spawnPids = do
   cfg <- get
@@ -98,14 +108,22 @@ getProgs spawnPids = do
   where
     progForPid cfg prid = cfg ^. configured . at prid
 
+
+-------------------------------------------------------------------------------
 configPids :: Config -> Set ProgramId
 configPids cfg = cfg ^. configured . to M.keys . to S.fromList
 
+
+-------------------------------------------------------------------------------
 mainLogger :: MonadWriter [String] m => String -> m ()
 mainLogger = ctxLogger "seraph"
 
+
+-------------------------------------------------------------------------------
 ctxLogger :: MonadWriter [String] m =>  String -> String -> m ()
 ctxLogger label s = tell [unwords [label, "-", s]]
 
+
+-------------------------------------------------------------------------------
 slen :: Show a => [a] -> String
 slen = show . length
