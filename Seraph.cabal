@@ -1,21 +1,18 @@
 name:                Seraph
 version:             0.0.0
 synopsis:            Rewrite of Angel
--- description:
+description:         Fully-compatible rewrite of the Angel process monitor.
 license:             MIT
 license-file:        LICENSE
 author:              Michael Xavier
 maintainer:          michael@michaelxavier.net
--- copyright:
+copyright:           (c) 2014-2015 Michael Xavier
 category:            System
 build-type:          Simple
--- extra-source-files:
 cabal-version:       >=1.10
 
 executable seraph
   main-is: Seraph/Main.hs
-  -- other-modules:
-  -- other-extensions:
   build-depends: async
   build-depends: base >=4.6
   build-depends: configurator >= 0.2.0.2
@@ -36,40 +33,38 @@ executable seraph
   build-depends: unordered-containers
   hs-source-dirs: src
   default-language:    Haskell2010
-  -- ghc-options: -threaded
-  --ghc-options: -threaded -auto-all -caf-all -Wall -Werror -fno-warn-unused-do-bind
-  ghc-options: -threaded -auto-all -caf-all -Wall -fno-warn-unused-do-bind -O2
+  ghc-options: -threaded -auto-all -caf-all -Wall -Werror -fno-warn-unused-do-bind
 
 
 test-suite spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   hs-source-dirs: src, test
-  build-depends: HUnit
-  build-depends: QuickCheck
-  build-depends: async
-  build-depends: base >=4.6
-  build-depends: configurator >= 0.2.0.2
-  build-depends: containers
-  build-depends: derive
-  build-depends: errors
-  build-depends: free
-  build-depends: hashable
-  build-depends: lens
-  build-depends: mtl
-  build-depends: mvc
-  build-depends: old-locale
-  build-depends: pipes
-  build-depends: SafeSemaphore
-  build-depends: split
-  build-depends: stm
-  build-depends: text
-  build-depends: time
-  build-depends: unix >= 2.7.0.1
-  build-depends: unordered-containers
-  build-depends: tasty
-  build-depends: tasty-hunit
-  build-depends: tasty-quickcheck
-  build-depends: quickcheck-properties
+  build-depends:  HUnit
+                , QuickCheck
+                , async
+                , base >=4.6
+                , configurator >= 0.2.0.2
+                , containers
+                , derive
+                , errors
+                , free
+                , hashable
+                , lens
+                , mtl
+                , mvc
+                , old-locale
+                , pipes
+                , SafeSemaphore
+                , split
+                , stm
+                , text
+                , time
+                , unix >= 2.7.0.1
+                , unordered-containers
+                , tasty
+                , tasty-hunit
+                , tasty-quickcheck
+                , quickcheck-properties
   ghc-options: -threaded -with-rtsopts=-N
   default-language: Haskell2010
